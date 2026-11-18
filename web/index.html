@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sunflower</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌻</text></svg>" />
+  </head>
+  <body>
+    <aside id="sidebar">
+      <header>
+        <h1>🌻 Sunflower</h1>
+        <p id="summary">Loading data…</p>
+        <label class="units"><input type="checkbox" id="imperial" checked /> Imperial units</label>
+      </header>
+      <section class="viz">
+        <label for="viz-select">Colour the map by</label>
+        <select id="viz-select"></select>
+        <label class="inline"><input type="checkbox" id="show-excluded" checked /> Show areas that don't match in grey</label>
+      </section>
+      <div id="filters"></div>
+      <footer id="sources"></footer>
+    </aside>
+    <main id="map"></main>
+    <div id="legend" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

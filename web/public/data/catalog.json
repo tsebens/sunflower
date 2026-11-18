@@ -1,0 +1,444 @@
+{
+ "grid": {
+  "west": -180.0,
+  "east": 40.0,
+  "south": 14.0,
+  "north": 84.0,
+  "res": 0.08333333333333333,
+  "cols": 2640,
+  "rows": 840,
+  "nodata": -32768
+ },
+ "layers": [
+  {
+   "id": "country",
+   "name": "Country",
+   "group": "Location",
+   "type": "categorical",
+   "file": "country.bin.gz",
+   "categories": [
+    {
+     "id": 1,
+     "code": "USA",
+     "name": "United States of America",
+     "group": "North America"
+    },
+    {
+     "id": 2,
+     "code": "CAN",
+     "name": "Canada",
+     "group": "North America"
+    },
+    {
+     "id": 3,
+     "code": "MEX",
+     "name": "Mexico",
+     "group": "North America"
+    },
+    {
+     "id": 4,
+     "code": "ALB",
+     "name": "Albania",
+     "group": "Europe"
+    },
+    {
+     "id": 5,
+     "code": "AND",
+     "name": "Andorra",
+     "group": "Europe"
+    },
+    {
+     "id": 6,
+     "code": "AUT",
+     "name": "Austria",
+     "group": "Europe"
+    },
+    {
+     "id": 7,
+     "code": "BEL",
+     "name": "Belgium",
+     "group": "Europe"
+    },
+    {
+     "id": 8,
+     "code": "BIH",
+     "name": "Bosnia and Herz.",
+     "group": "Europe"
+    },
+    {
+     "id": 9,
+     "code": "BGR",
+     "name": "Bulgaria",
+     "group": "Europe"
+    },
+    {
+     "id": 10,
+     "code": "HRV",
+     "name": "Croatia",
+     "group": "Europe"
+    },
+    {
+     "id": 11,
+     "code": "CZE",
+     "name": "Czechia",
+     "group": "Europe"
+    },
+    {
+     "id": 12,
+     "code": "DNK",
+     "name": "Denmark",
+     "group": "Europe"
+    },
+    {
+     "id": 13,
+     "code": "EST",
+     "name": "Estonia",
+     "group": "Europe"
+    },
+    {
+     "id": 14,
+     "code": "FRO",
+     "name": "Faeroe Is.",
+     "group": "Europe"
+    },
+    {
+     "id": 15,
+     "code": "FIN",
+     "name": "Finland",
+     "group": "Europe"
+    },
+    {
+     "id": 16,
+     "code": "FRA",
+     "name": "France",
+     "group": "Europe"
+    },
+    {
+     "id": 17,
+     "code": "DEU",
+     "name": "Germany",
+     "group": "Europe"
+    },
+    {
+     "id": 19,
+     "code": "GRC",
+     "name": "Greece",
+     "group": "Europe"
+    },
+    {
+     "id": 20,
+     "code": "GGY",
+     "name": "Guernsey",
+     "group": "Europe"
+    },
+    {
+     "id": 21,
+     "code": "HUN",
+     "name": "Hungary",
+     "group": "Europe"
+    },
+    {
+     "id": 22,
+     "code": "ISL",
+     "name": "Iceland",
+     "group": "Europe"
+    },
+    {
+     "id": 23,
+     "code": "IRL",
+     "name": "Ireland",
+     "group": "Europe"
+    },
+    {
+     "id": 24,
+     "code": "IMN",
+     "name": "Isle of Man",
+     "group": "Europe"
+    },
+    {
+     "id": 25,
+     "code": "ITA",
+     "name": "Italy",
+     "group": "Europe"
+    },
+    {
+     "id": 26,
+     "code": "JEY",
+     "name": "Jersey",
+     "group": "Europe"
+    },
+    {
+     "id": 27,
+     "code": "KOS",
+     "name": "Kosovo",
+     "group": "Europe"
+    },
+    {
+     "id": 28,
+     "code": "LVA",
+     "name": "Latvia",
+     "group": "Europe"
+    },
+    {
+     "id": 29,
+     "code": "LIE",
+     "name": "Liechtenstein",
+     "group": "Europe"
+    },
+    {
+     "id": 30,
+     "code": "LTU",
+     "name": "Lithuania",
+     "group": "Europe"
+    },
+    {
+     "id": 31,
+     "code": "LUX",
+     "name": "Luxembourg",
+     "group": "Europe"
+    },
+    {
+     "id": 32,
+     "code": "MLT",
+     "name": "Malta",
+     "group": "Europe"
+    },
+    {
+     "id": 33,
+     "code": "MDA",
+     "name": "Moldova",
+     "group": "Europe"
+    },
+    {
+     "id": 35,
+     "code": "MNE",
+     "name": "Montenegro",
+     "group": "Europe"
+    },
+    {
+     "id": 36,
+     "code": "NLD",
+     "name": "Netherlands",
+     "group": "Europe"
+    },
+    {
+     "id": 37,
+     "code": "MKD",
+     "name": "North Macedonia",
+     "group": "Europe"
+    },
+    {
+     "id": 38,
+     "code": "NOR",
+     "name": "Norway",
+     "group": "Europe"
+    },
+    {
+     "id": 39,
+     "code": "POL",
+     "name": "Poland",
+     "group": "Europe"
+    },
+    {
+     "id": 40,
+     "code": "PRT",
+     "name": "Portugal",
+     "group": "Europe"
+    },
+    {
+     "id": 41,
+     "code": "ROU",
+     "name": "Romania",
+     "group": "Europe"
+    },
+    {
+     "id": 42,
+     "code": "SMR",
+     "name": "San Marino",
+     "group": "Europe"
+    },
+    {
+     "id": 43,
+     "code": "SRB",
+     "name": "Serbia",
+     "group": "Europe"
+    },
+    {
+     "id": 44,
+     "code": "SVK",
+     "name": "Slovakia",
+     "group": "Europe"
+    },
+    {
+     "id": 45,
+     "code": "SVN",
+     "name": "Slovenia",
+     "group": "Europe"
+    },
+    {
+     "id": 46,
+     "code": "ESP",
+     "name": "Spain",
+     "group": "Europe"
+    },
+    {
+     "id": 47,
+     "code": "SWE",
+     "name": "Sweden",
+     "group": "Europe"
+    },
+    {
+     "id": 48,
+     "code": "CHE",
+     "name": "Switzerland",
+     "group": "Europe"
+    },
+    {
+     "id": 49,
+     "code": "UKR",
+     "name": "Ukraine",
+     "group": "Europe"
+    },
+    {
+     "id": 50,
+     "code": "GBR",
+     "name": "United Kingdom",
+     "group": "Europe"
+    },
+    {
+     "id": 52,
+     "code": "ALD",
+     "name": "\u00c5land",
+     "group": "Europe"
+    }
+   ],
+   "source": "Natural Earth 1:10m Admin 0 Countries"
+  },
+  {
+   "id": "temp_mean",
+   "name": "Average temperature",
+   "description": "Yearly average air temperature.",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "degC",
+   "colormap": "temperature",
+   "source": "WorldClim 2.1 BIO1",
+   "file": "temp_mean.bin.gz",
+   "scale": 0.1,
+   "offset": 0.0,
+   "min": -28.0,
+   "max": 29.0
+  },
+  {
+   "id": "temp_max",
+   "name": "Summer highs",
+   "description": "Average daily high in the warmest month.",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "degC",
+   "colormap": "temperature",
+   "source": "WorldClim 2.1 BIO5",
+   "file": "temp_max.bin.gz",
+   "scale": 0.1,
+   "offset": 0.0,
+   "min": -7.0,
+   "max": 46.0
+  },
+  {
+   "id": "temp_min",
+   "name": "Winter lows",
+   "description": "Average nightly low in the coldest month.",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "degC",
+   "colormap": "temperature",
+   "source": "WorldClim 2.1 BIO6",
+   "file": "temp_min.bin.gz",
+   "scale": 0.1,
+   "offset": 0.0,
+   "min": -48.0,
+   "max": 22.0
+  },
+  {
+   "id": "precip_annual",
+   "name": "Yearly rain & snow",
+   "description": "Total yearly precipitation (rain plus snow, as water).",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "mm",
+   "colormap": "precipitation",
+   "source": "WorldClim 2.1 BIO12",
+   "file": "precip_annual.bin.gz",
+   "scale": 1,
+   "offset": 0.0,
+   "min": 46.0,
+   "max": 5123.0
+  },
+  {
+   "id": "dist_coast",
+   "name": "Distance to the ocean",
+   "description": "Straight-line distance to the nearest ocean coastline.",
+   "group": "Geography",
+   "type": "numeric",
+   "unit": "km",
+   "colormap": "distance",
+   "source": "Natural Earth 1:10m Coastline",
+   "file": "dist_coast.bin.gz",
+   "scale": 1,
+   "offset": 0.0,
+   "min": 0.0,
+   "max": 1638.0
+  },
+  {
+   "id": "dist_city",
+   "name": "Distance to a major city",
+   "description": "Straight-line distance to the nearest city whose metro population is at least the chosen size.",
+   "group": "Geography",
+   "type": "numeric",
+   "unit": "km",
+   "colormap": "distance",
+   "source": "Natural Earth 1:10m Populated Places (POP_MAX)",
+   "variantLabel": "City size",
+   "variants": [
+    {
+     "key": "100000",
+     "label": "100k+",
+     "file": "dist_city_100000.bin.gz",
+     "scale": 1,
+     "offset": 0.0,
+     "min": 0.0,
+     "max": 2742.0
+    },
+    {
+     "key": "300000",
+     "label": "300k+",
+     "file": "dist_city_300000.bin.gz",
+     "scale": 1,
+     "offset": 0.0,
+     "min": 0.0,
+     "max": 3423.0
+    },
+    {
+     "key": "500000",
+     "label": "500k+",
+     "file": "dist_city_500000.bin.gz",
+     "scale": 1,
+     "offset": 0.0,
+     "min": 0.0,
+     "max": 3479.0
+    },
+    {
+     "key": "1000000",
+     "label": "1M+",
+     "file": "dist_city_1000000.bin.gz",
+     "scale": 1,
+     "offset": 0.0,
+     "min": 0.0,
+     "max": 4021.0
+    }
+   ],
+   "min": 0.0,
+   "max": 4021.0
+  }
+ ]
+}
