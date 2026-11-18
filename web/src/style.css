@@ -1,0 +1,187 @@
+:root {
+  --bg: #fbfaf7;
+  --panel: #ffffff;
+  --text: #22201c;
+  --muted: #6e6a62;
+  --line: #e6e2da;
+  --accent: #c98a0b;
+  --accent-soft: #fdf3dc;
+  --hist-ghost: #ebe7df;
+  --hist-on: #e0a42a;
+  --hist-off: #c9c4ba;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --panel: #202024;
+    --text: #ece9e3;
+    --muted: #a19d95;
+    --line: #34343a;
+    --accent: #f0b43c;
+    --accent-soft: #3a3020;
+    --hist-ghost: #2d2d33;
+    --hist-on: #e8a317;
+    --hist-off: #5a5852;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  display: flex;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+button { font: inherit; color: inherit; }
+
+#sidebar {
+  width: 340px;
+  flex: none;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+}
+#map { flex: 1; min-width: 0; }
+
+header { padding: 16px 16px 8px; }
+h1 { margin: 0 0 4px; font-size: 20px; }
+#summary { margin: 0 0 8px; color: var(--muted); min-height: 2.8em; }
+.units, .inline { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+
+.viz { padding: 8px 16px 12px; display: grid; gap: 6px; border-bottom: 1px solid var(--line); }
+.viz > label:first-child { font-weight: 600; }
+select, .search {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.group { border-bottom: 1px solid var(--line); }
+.group > summary {
+  padding: 12px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.card {
+  margin: 0 12px 10px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.card.active { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.card-head { display: flex; align-items: baseline; gap: 8px; }
+.card-title { font-weight: 600; }
+.card-value { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.card.active .card-value { color: var(--accent); font-weight: 600; }
+.card-desc { margin: 2px 0 8px; color: var(--muted); font-size: 12.5px; }
+.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.link:hover { text-decoration: underline; }
+
+.segmented { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 8px; }
+.seg-label { color: var(--muted); font-size: 12.5px; margin-right: 2px; }
+.seg {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.seg.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* Dual-handle range: two stacked native range inputs over a histogram canvas. */
+.range { position: relative; height: 58px; }
+.hist { position: absolute; left: 8px; right: 8px; top: 0; width: calc(100% - 16px); height: 44px; }
+.range input[type="range"] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  margin: 0;
+  height: 18px;
+  background: none;
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.range input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--line); border-radius: 2px; }
+.range input[type="range"]::-moz-range-track { height: 4px; background: var(--line); border-radius: 2px; }
+.range input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  cursor: grab;
+}
+.range input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  cursor: grab;
+}
+.range input[type="range"] + input[type="range"]::-webkit-slider-runnable-track { background: transparent; }
+.range input[type="range"] + input[type="range"]::-moz-range-track { background: transparent; }
+.range-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+
+.cat-list { max-height: 240px; overflow-y: auto; margin-top: 8px; }
+.cat-group { display: flex; gap: 8px; align-items: baseline; margin: 6px 0 2px; }
+.cat-group strong { margin-right: auto; font-size: 12.5px; }
+.cat { display: flex; gap: 6px; align-items: center; padding: 1px 0; font-size: 13px; cursor: pointer; }
+
+#sources { padding: 12px 16px 20px; color: var(--muted); font-size: 11.5px; }
+
+#legend {
+  position: absolute;
+  left: 356px;
+  bottom: 28px;
+  width: 260px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+.legend-title { font-weight: 600; margin-bottom: 6px; }
+.ramp { height: 12px; border-radius: 3px; }
+.swatch { width: 40px; height: 12px; border-radius: 3px; }
+.legend-ends { display: flex; justify-content: space-between; font-size: 12px; margin-top: 3px; }
+.legend-note { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+
+.maplibregl-popup-content { background: var(--panel); color: var(--text); font-size: 13px; }
+.maplibregl-popup-tip { display: none; }
+.maplibregl-popup-content table { border-collapse: collapse; }
+.maplibregl-popup-content th { text-align: left; font-weight: 500; color: var(--muted); padding: 2px 10px 2px 0; }
+.maplibregl-popup-content td { text-align: right; white-space: nowrap; }
+.pop-match { font-weight: 600; margin-bottom: 6px; color: var(--muted); }
+.pop-match.yes { color: var(--accent); }
+.pop-at { color: var(--muted); font-size: 11.5px; margin-top: 6px; }
+
+@media (max-width: 720px) {
+  body { flex-direction: column-reverse; }
+  #sidebar { width: 100%; height: 50%; border-right: 0; border-top: 1px solid var(--line); }
+  #legend { left: 12px; top: 12px; bottom: auto; width: 220px; }
+}
