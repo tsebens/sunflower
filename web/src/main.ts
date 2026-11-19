@@ -105,6 +105,11 @@ async function boot() {
     box.checked = ref.default;
     box.onchange = () => {
       setReferenceVisible(map, ref.key, box.checked);
+      // Turning on satellite imagery under a nearly opaque overlay would show nothing new.
+      if (ref.key === "satellite" && box.checked && Number(opacity.value) > 45) {
+        opacity.value = "40";
+        applyDisplay();
+      }
       schedule();
     };
     refToggles.set(ref.key, box);

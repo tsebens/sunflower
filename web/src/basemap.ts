@@ -29,6 +29,7 @@ export interface ReferenceLayer {
 }
 
 export const REFERENCE_LAYERS: ReferenceLayer[] = [
+  { key: "satellite", label: "Satellite imagery", hint: "Sentinel-2, 2023", layers: ["satellite"], default: false },
   { key: "hillshade", label: "Terrain shading", layers: ["hillshade"], default: true },
   { key: "states", label: "State / province borders", layers: ["boundary_state", "label_state"], default: true },
   { key: "counties", label: "County borders", hint: "appear when zoomed in", layers: ["boundary_county"], default: true },
@@ -96,6 +97,14 @@ export function basemapStyle(dark: boolean): maplibregl.StyleSpecification {
   const c = dark ? palettes.dark : palettes.light;
   const layers: Layer[] = [
     { id: "background", type: "background", paint: { "background-color": c.land } },
+    // Cloud-free satellite mosaic; sits under the data overlay, so lower the overlay opacity to see it.
+    {
+      id: "satellite",
+      type: "raster",
+      source: "satellite",
+      layout: { visibility: "none" },
+      paint: { "raster-fade-duration": 150 },
+    },
     // (data overlay goes here)
     {
       id: "hillshade",
@@ -260,6 +269,14 @@ export function basemapStyle(dark: boolean): maplibregl.StyleSpecification {
       },
       // A separate copy of the elevation source for 3D terrain (recommended over sharing
       // one source between hillshade and terrain).
+      satellite: {
+        type: "raster",
+        tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg"],
+        tileSize: 256,
+        maxzoom: 15,
+        attribution:
+          '<a href="https://s2maps.eu">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2023)',
+      },
       terrain3d: {
         type: "raster-dem",
         tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
