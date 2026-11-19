@@ -9,7 +9,16 @@ interface UnitSpec {
 }
 const same = (label: string, digits = 0): UnitSpec => ({ label, conv: (v) => v, digits });
 
-const imperial: Record<Exclude<Unit, "zone">, UnitSpec> = {
+type Plain = Exclude<Unit, "zone" | "people" | "usd" | "pct">;
+
+/** Round to 2 significant figures for slider labels: 2,000 / 25,000 / 1,300,000. */
+function nice(v: number): number {
+  if (v === 0) return 0;
+  const p = 10 ** (Math.floor(Math.log10(Math.abs(v))) - 1);
+  return Math.round(v / p) * p;
+}
+
+const imperial: Record<Plain, UnitSpec> = {
   degC: { label: "°F", conv: (c) => (c * 9) / 5 + 32, digits: 0 },
   mm: { label: "in", conv: (mm) => mm / 25.4, digits: 0 },
   km: { label: "mi", conv: (km) => km / 1.609344, digits: 0 },
@@ -18,7 +27,7 @@ const imperial: Record<Exclude<Unit, "zone">, UnitSpec> = {
   Mbps: same("Mbps"),
 };
 
-const metric: Record<Exclude<Unit, "zone">, UnitSpec> = {
+const metric: Record<Plain, UnitSpec> = {
   degC: same("°C"),
   mm: same("mm"),
   km: same("km"),
@@ -37,6 +46,12 @@ function zoneLabel(v: number): string {
 export function fmt(value: number, unit: Unit, digits?: number): string {
   if (!Number.isFinite(value)) return "no data";
   if (unit === "zone") return zoneLabel(value);
+  if (unit === "people") return nice(value).toLocaleString();
+  if (unit === "usd") {
+    const v = nice(value);
+    return v >= 1e6 ? `$${(v / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 })}M` : `$${Math.round(v / 1e3)}k`;
+  }
+  if (unit === "pct") return `${value > 0 ? "+" : ""}${Math.round(value)}%`;
   const u = (settings.imperial ? imperial : metric)[unit];
   const v = u.conv(value);
   const d = digits ?? u.digits;

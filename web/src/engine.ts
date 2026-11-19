@@ -11,6 +11,8 @@ export interface NumericLayer {
   /** Filter bounds in base units. The filter is inactive when it spans [def.min, def.max]. */
   lo: number;
   hi: number;
+  /** Where "Reset" returns the lower bound (defaults to def.min). */
+  defaultLo?: number;
   /** Histogram of all in-region cells, per band (computed once). */
   fullHist: Uint32Array[];
   /** Histogram of cells passing every *other* filter (recomputed on change). */

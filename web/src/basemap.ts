@@ -41,7 +41,7 @@ export const REFERENCE_LAYERS: ReferenceLayer[] = [
   {
     key: "places",
     label: "Cities & towns",
-    hint: "hover or click for details",
+    hint: "click a town for details",
     layers: [...TOWN_DOT_IDS, ...TOWN_LABEL_IDS],
     default: true,
   },

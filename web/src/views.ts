@@ -17,6 +17,7 @@ export interface ViewState {
   countries: string[];
   /** Towns whose cards are pinned (town ids). */
   pins?: string[];
+  /** Legacy (before town filters): minimum town population. Read on load, no longer written. */
   townMinPop?: number;
   terrain3d?: boolean;
   exaggeration?: number;
