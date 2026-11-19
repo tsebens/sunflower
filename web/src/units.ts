@@ -9,7 +9,7 @@ interface UnitSpec {
 }
 const same = (label: string, digits = 0): UnitSpec => ({ label, conv: (v) => v, digits });
 
-type Plain = Exclude<Unit, "zone" | "people" | "usd" | "pct">;
+type Plain = Exclude<Unit, "zone" | "people" | "usd" | "pct" | "share">;
 
 /** Round to 2 significant figures for slider labels: 2,000 / 25,000 / 1,300,000. */
 function nice(v: number): number {
@@ -51,6 +51,7 @@ export function fmt(value: number, unit: Unit, digits?: number): string {
     const v = nice(value);
     return v >= 1e6 ? `$${(v / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 })}M` : `$${Math.round(v / 1e3)}k`;
   }
+  if (unit === "share") return `${Math.round(value)}%`;
   if (unit === "pct") return `${value > 0 ? "+" : ""}${Math.round(value)}%`;
   const u = (settings.imperial ? imperial : metric)[unit];
   const v = u.conv(value);

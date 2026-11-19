@@ -5,8 +5,19 @@ import "./style.css";
 
 import { basemapStyle, GRID_BEFORE, REFERENCE_LAYERS, setReferenceVisible } from "./basemap";
 import { lut, MATCH_COLOR, rampStops, solid } from "./colormaps";
-import { loadBands, loadCatalog, loadUint8, type CategoricalLayerDef, type NumericLayerDef } from "./data";
-import { band, BINS, Engine, isActive, type NumericLayer, type Result } from "./engine";
+import { loadBands, loadCatalog, loadUint16, loadUint8, type CategoricalLayerDef, type NumericLayerDef } from "./data";
+import {
+  band,
+  BINS,
+  categoryAt,
+  Engine,
+  isActive,
+  isCategorical,
+  type AnyLayer,
+  type CategoricalLayer,
+  type NumericLayer,
+  type Result,
+} from "./engine";
 import { GridOverlay } from "./overlay";
 import { loadTowns, Towns } from "./towns";
 import { categoryCard, group, numericCard, type Card } from "./ui";
@@ -29,13 +40,20 @@ function areaText(km2: number): string {
 
 async function boot() {
   const catalog = await loadCatalog();
-  const countryDef = catalog.layers.find((l) => l.type === "categorical") as CategoricalLayerDef;
+  const countryDef = catalog.layers.find((l) => l.id === "country") as CategoricalLayerDef;
+  // Other category layers (biome, ecoregion). Layers can share one file via a lookup table.
+  const catDefs = catalog.layers.filter((l): l is CategoricalLayerDef => l.type === "categorical" && l.id !== "country");
+  const catFiles = [...new Set(catDefs.map((d) => d.file))];
+  const catValuesPromise = Promise.all(
+    catFiles.map((f) => (catDefs.find((d) => d.file === f)!.dtype === "uint16" ? loadUint16(f) : loadUint8(f))),
+  );
   const numericDefs = catalog.layers.filter((l): l is NumericLayerDef => l.type === "numeric");
 
   summary.textContent = `Loading ${catalog.layers.length} layers…`;
   const townsPromise = loadTowns();
-  const [countryValues, ...bandSets] = await Promise.all([
+  const [countryValues, catValues, ...bandSets] = await Promise.all([
     loadUint8(countryDef.file),
+    catValuesPromise,
     ...numericDefs.map(loadBands),
   ]);
 
@@ -50,7 +68,20 @@ async function boot() {
     fullHist: [],
     crossHist: new Uint32Array(BINS),
   }));
-  const engine = new Engine(catalog, { def: countryDef, values: countryValues, selected: new Set() }, numeric);
+  const cats: CategoricalLayer[] = catDefs.map((def) => ({
+    def,
+    values: catValues[catFiles.indexOf(def.file)],
+    lookup: def.lookup ? Uint16Array.from(def.lookup) : undefined,
+    selected: new Set<number>(),
+  }));
+  const catColors = new Map(
+    cats.map((c) => {
+      const colors = new Uint32Array(65536);
+      for (const k of c.def.categories) if (k.color) colors[k.id] = solid(k.color, 225);
+      return [c, colors] as const;
+    }),
+  );
+  const engine = new Engine(catalog, { def: countryDef, values: countryValues, selected: new Set() }, numeric, cats);
 
   // ---- map ---------------------------------------------------------------
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
@@ -75,8 +106,11 @@ async function boot() {
     onPinsChange: () => schedule(),
     climateRows(lon, lat) {
       const i = engine.cellAt(lon, lat);
-      const ids = ["temp_max", "temp_min", "precip_annual", "dewpoint_summer", "sunshine_hours", "hardiness_zone", "elevation", "dist_coast"];
-      return ids
+      const ids = ["temp_max", "temp_min", "precip_annual", "dewpoint_summer", "sunshine_hours", "hardiness_zone", "elevation", "tree_cover", "ruggedness", "dist_coast"];
+      const eco = cats.find((c) => c.def.id === "ecoregion");
+      const ecoName = eco && i >= 0 ? eco.def.categories.find((k) => k.id === categoryAt(eco, i))?.name : undefined;
+      const ecoRow = eco ? `<tr><th>Ecoregion</th><td class="wrap">${ecoName ?? "n/a"}</td></tr>` : "";
+      return ecoRow + ids
         .map((id) => layerById(id))
         .filter((l): l is NumericLayer => !!l)
         .map((l) => `<tr><th>${l.def.name}</th><td>${i < 0 ? "n/a" : fmt(engine.valueAt(l, band(l), i), l.def.unit)}</td></tr>`)
@@ -88,6 +122,7 @@ async function boot() {
   const vizSelect = $<HTMLSelectElement>("viz-select");
   vizSelect.append(new Option("Just show matching areas", ""));
   for (const l of numeric) vizSelect.append(new Option(l.def.name, l.def.id));
+  for (const c of cats) if (c.def.colorable) vizSelect.append(new Option(c.def.name, c.def.id));
   vizSelect.value = "temp_mean";
   const showExcluded = $<HTMLInputElement>("show-excluded");
   const imperial = $<HTMLInputElement>("imperial");
@@ -129,9 +164,15 @@ async function boot() {
   const countryCard = categoryCard(engine.country, () => schedule());
   cards.push(countryCard);
   filters.append(group("Location", false, [countryCard]));
-  const groups = [...new Set(numeric.map((l) => l.def.group))];
-  for (const g of groups) {
-    const gc = numeric.filter((l) => l.def.group === g).map((l) => numericCard(l, () => schedule()));
+  const filterDefs = catalog.layers.filter((l) => l.id !== "country");
+  for (const g of [...new Set(filterDefs.map((l) => l.group))]) {
+    const gc = filterDefs
+      .filter((l) => l.group === g)
+      .map((def) =>
+        def.type === "categorical"
+          ? categoryCard(cats.find((c) => c.def.id === def.id)!, () => schedule())
+          : numericCard(numeric.find((l) => l.def.id === def.id)!, () => schedule()),
+      );
     cards.push(...gc);
     filters.append(group(g, true, gc));
   }
@@ -171,6 +212,11 @@ async function boot() {
       layers: Object.fromEntries([...refToggles].map(([k, b]) => [k, b.checked])),
       filters: f,
       countries: countryDef.categories.filter((c) => engine.country.selected.has(c.id)).map((c) => c.code),
+      cats: Object.fromEntries(
+        cats
+          .filter((c) => c.selected.size > 0)
+          .map((c) => [c.def.id, c.def.categories.filter((k) => c.selected.has(k.id)).map((k) => k.code).sort()]),
+      ),
       pins: towns.pinnedIds().sort(),
       terrain3d: terrain3d.checked,
       exaggeration: Number(exaggeration.value),
@@ -209,13 +255,17 @@ async function boot() {
     }
     const codes = new Set(Array.isArray(s.countries) ? s.countries : []);
     engine.country.selected = new Set(countryDef.categories.filter((c) => codes.has(c.code)).map((c) => c.id));
+    for (const c of cats) {
+      const want = new Set(Array.isArray(s.cats?.[c.def.id]) ? s.cats![c.def.id] : []);
+      c.selected = new Set(c.def.categories.filter((k) => want.has(k.code)).map((k) => k.id));
+    }
     applyDisplay();
     schedule();
   }
 
   function clearFilters() {
     const s = getState();
-    setState({ ...s, filters: {}, countries: [] });
+    setState({ ...s, filters: {}, countries: [], cats: {} });
   }
 
   let terrainOn = false;
@@ -255,8 +305,8 @@ async function boot() {
   function schedule() {
     if (!frame) frame = requestAnimationFrame(render);
   }
-  function currentViz(): NumericLayer | null {
-    return numeric.find((l) => l.def.id === vizSelect.value) ?? null;
+  function currentViz(): AnyLayer | null {
+    return numeric.find((l) => l.def.id === vizSelect.value) ?? cats.find((c) => c.def.id === vizSelect.value) ?? null;
   }
   function render() {
     frame = 0;
@@ -264,7 +314,15 @@ async function boot() {
     const res = (last = engine.run(viz));
     const excluded = showExcluded.checked ? solid(dark ? "#555555" : "#9a9a9a", 110) : 0;
     overlay.update(
-      engine.colorize(res, viz, lut(viz?.def.colormap ?? "distance"), solid(MATCH_COLOR, 220), excluded, solid(MATCH_COLOR, 70)),
+      engine.colorize(
+        res,
+        viz,
+        lut(viz && !isCategorical(viz) ? viz.def.colormap : "distance"),
+        solid(MATCH_COLOR, 220),
+        excluded,
+        solid(MATCH_COLOR, 70),
+        viz && isCategorical(viz) ? catColors.get(viz) : undefined,
+      ),
     );
     towns.applyFilters();
     townCount.textContent = `${towns.shownCount.toLocaleString()} of ${towns.totalCount.toLocaleString()} towns pass these filters (pinned towns always stay).`;
@@ -280,11 +338,24 @@ async function boot() {
     syncUrl(state);
   }
 
-  function drawLegend(viz: NumericLayer | null, res: Result) {
+  function drawLegend(viz: AnyLayer | null, res: Result) {
     const legend = $("legend");
     legend.hidden = false;
     if (!viz) {
       legend.innerHTML = `<div class="legend-title">Matching areas</div><div class="swatch" style="background:${MATCH_COLOR}"></div>`;
+      return;
+    }
+    if (isCategorical(viz)) {
+      // Categories present among matching areas, largest first.
+      const counts = res.vizCats!;
+      const total = viz.def.categories.reduce((a, k) => a + counts[k.id], 0) || 1;
+      const present = viz.def.categories.filter((k) => counts[k.id] > 0).sort((a, b) => counts[b.id] - counts[a.id]);
+      const shown = present.slice(0, 8);
+      const rows = shown
+        .map((k) => `<div class="legend-cat"><span class="swatch small" style="background:${k.color}"></span><span>${k.name}</span><span class="legend-share">${Math.round((100 * counts[k.id]) / total)}%</span></div>`)
+        .join("");
+      const more = present.length > shown.length ? `<div class="legend-note">+ ${present.length - shown.length} more</div>` : "";
+      legend.innerHTML = `<div class="legend-title">${viz.def.name}</div>${rows || '<div class="legend-note">Nothing to show</div>'}${more}`;
       return;
     }
     const name = viz.def.variants ? `${viz.def.name} (${band(viz).label})` : viz.def.name;
@@ -345,6 +416,13 @@ async function boot() {
     const countryFails = engine.country.selected.size > 0 && !engine.country.selected.has(cid);
     const rows = [`<tr><th>Country</th><td>${fail(countryFails, cat?.name ?? "?", "Not one of your selected countries")}</td></tr>`];
     let failures = countryFails ? 1 : 0;
+    for (const c of cats) {
+      const k = categoryAt(c, i);
+      const name = c.def.categories.find((x) => x.id === k)?.name ?? "n/a";
+      const bad = c.selected.size > 0 && !c.selected.has(k);
+      if (bad) failures++;
+      rows.push(`<tr${bad ? ' class="fail-row"' : ""}><th>${c.def.name}</th><td class="wrap">${fail(bad, name, `Not one of your selected ${c.def.name.toLowerCase()}s`)}</td></tr>`);
+    }
     for (const l of numeric) {
       const b = band(l);
       const v = engine.valueAt(l, b, i);

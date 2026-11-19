@@ -21,10 +21,17 @@ export interface NumericLayer {
 
 export interface CategoricalLayer {
   def: CategoricalLayerDef;
-  values: Uint8Array;
+  values: Uint8Array | Uint16Array;
+  /** Maps a stored value to a category id (e.g. ecoregion -> biome). Absent = the value is the id. */
+  lookup?: Uint16Array;
   /** Selected category ids; empty = no restriction. */
   selected: Set<number>;
 }
+
+export type AnyLayer = NumericLayer | CategoricalLayer;
+export const isCategorical = (l: AnyLayer): l is CategoricalLayer => "selected" in l;
+/** Category id of cell i (0 = none). */
+export const categoryAt = (l: CategoricalLayer, i: number): number => (l.lookup ? l.lookup[l.values[i]] : l.values[i]);
 
 export interface Result {
   pass: Uint8Array;
@@ -35,6 +42,8 @@ export interface Result {
   vizMax: number;
   /** Matching cells with no value for the visualised layer. */
   vizNoData: number;
+  /** When colouring by a category layer: matching cells per category id. */
+  vizCats?: Uint32Array;
 }
 
 export const band = (l: NumericLayer): Band => l.bands[l.bandIndex];
@@ -46,9 +55,12 @@ export class Engine {
   readonly nodata: number;
   readonly country: CategoricalLayer;
   readonly numeric: NumericLayer[];
+  /** Category filters other than country (e.g. biome, ecoregion). */
+  readonly cats: CategoricalLayer[];
   readonly regionCount: number;
 
-  constructor(catalog: Catalog, country: CategoricalLayer, numeric: NumericLayer[]) {
+  constructor(catalog: Catalog, country: CategoricalLayer, numeric: NumericLayer[], cats: CategoricalLayer[] = []) {
+    this.cats = cats;
     this.grid = catalog.grid;
     this.n = catalog.grid.cols * catalog.grid.rows;
     this.nodata = catalog.grid.nodata;
@@ -77,8 +89,18 @@ export class Engine {
   }
 
   /** Recompute matches. Also fills each layer's cross-filter histogram in the same pass. */
-  run(viz: NumericLayer | null): Result {
+  run(vizLayerOrCat: AnyLayer | null): Result {
     const { n, nodata } = this;
+    const viz = vizLayerOrCat && !isCategorical(vizLayerOrCat) ? vizLayerOrCat : null;
+    const catViz = vizLayerOrCat && isCategorical(vizLayerOrCat) ? vizLayerOrCat : null;
+    const vizCats = catViz ? new Uint32Array(65536) : undefined;
+    const activeCats = this.cats
+      .filter((c) => c.selected.size > 0)
+      .map((c) => {
+        const allowed = new Uint8Array(65536);
+        for (const id of c.selected) allowed[id] = 1;
+        return { values: c.values, lookup: c.lookup, allowed };
+      });
     const cv = this.country.values;
     const catActive = this.country.selected.size > 0;
     const allowed = new Uint8Array(256);
@@ -116,6 +138,13 @@ export class Engine {
         fails++;
         failIdx = -2;
       }
+      for (const a of activeCats) {
+        const v = a.values[i];
+        if (a.allowed[a.lookup ? a.lookup[v] : v] === 0) {
+          fails++;
+          failIdx = -2;
+        }
+      }
       for (let k = 0; k < L && fails < 2; k++) {
         if (!active[k]) continue;
         const v = arrs[k][i];
@@ -134,6 +163,10 @@ export class Engine {
         if (vizIdx >= 0) {
           const v = arrs[vizIdx][i];
           if (v !== nodata) vizHist[vizBin(v)]++;
+          else vizNoData++;
+        } else if (catViz) {
+          const k = categoryAt(catViz, i);
+          if (k) vizCats![k]++;
           else vizNoData++;
         }
       } else if (fails === 1 && failIdx >= 0) {
@@ -159,21 +192,32 @@ export class Engine {
         }
       }
     }
-    return { pass, matchCount, regionCount: this.regionCount, vizMin, vizMax, vizNoData };
+    return { pass, matchCount, regionCount: this.regionCount, vizMin, vizMax, vizNoData, vizCats };
   }
 
   /** Colour every grid cell (row-major, north-up, lat/lon grid) into packed RGBA ints. */
   colorize(
     res: Result,
-    viz: NumericLayer | null,
+    vizLayerOrCat: AnyLayer | null,
     lut: Uint32Array,
     matchColor: number,
     excludedColor: number,
     noDataColor: number,
+    /** For category layers: packed colour per category id. */
+    catColors?: Uint32Array,
   ): Uint32Array {
     const { n, nodata } = this;
     const cv = this.country.values;
     const out = new Uint32Array(n);
+    if (vizLayerOrCat && isCategorical(vizLayerOrCat) && catColors) {
+      for (let i = 0; i < n; i++) {
+        if (cv[i] === 0) continue;
+        const k = categoryAt(vizLayerOrCat, i);
+        out[i] = !res.pass[i] ? excludedColor : k ? catColors[k] : noDataColor;
+      }
+      return out;
+    }
+    const viz = vizLayerOrCat as NumericLayer | null;
     const vb = viz ? band(viz) : null;
     const span = res.vizMax - res.vizMin || 1;
     for (let i = 0; i < n; i++) {

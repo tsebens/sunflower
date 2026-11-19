@@ -25,6 +25,7 @@ from rasterio.enums import Resampling
 from rasterio.features import rasterize
 from rasterio.transform import from_origin
 from rasterio.warp import reproject
+from rasterio.windows import Window
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
@@ -291,6 +292,107 @@ def build_internet_speed() -> np.ndarray:
     return out.reshape(ROWS, COLS)
 
 
+def build_ecoregions(mask: np.ndarray) -> tuple[np.ndarray, list[dict], list[dict], list[int]]:
+    """RESOLVE Ecoregions 2017 rasterised onto the grid.
+
+    Returns (grid of compact ecoregion ids, ecoregion categories, biome categories,
+    lookup from ecoregion id -> biome id). 0 = no ecoregion.
+    """
+    eco = gpd.read_file(f"zip://{RAW / 'ecoregions2017.zip'}")
+    eco = eco.cx[WEST:EAST, SOUTH:NORTH]
+    # "Rock and Ice" has no biome in the source; give it one so it can be filtered.
+    rock = eco.ECO_NAME == "Rock and Ice"
+    eco.loc[rock, "BIOME_NAME"] = "Rock & Ice"
+    eco.loc[rock, "COLOR_BIO"] = "#D9D9D9"
+    # Rasterise by OBJECTID (unique, unlike ECO_ID which is 0 for Rock and Ice).
+    raw = rasterize(
+        ((g, int(o)) for g, o in zip(eco.geometry, eco.OBJECTID)),
+        out_shape=(ROWS, COLS), transform=TRANSFORM, fill=0, dtype="int32",
+    )
+    raw[~mask] = 0
+    present = [o for o in np.unique(raw) if o != 0]
+    info = eco.drop_duplicates("OBJECTID").set_index("OBJECTID")
+
+    biome_names = sorted({info.loc[o, "BIOME_NAME"] for o in present})
+    biome_id = {b: k + 1 for k, b in enumerate(biome_names)}
+    biome_color = {info.loc[o, "BIOME_NAME"]: info.loc[o, "COLOR_BIO"] for o in present}
+    biomes = [{"id": biome_id[b], "code": b, "name": b, "group": "Biomes", "color": biome_color[b]} for b in biome_names]
+
+    # Several source polygons can share an ecoregion name; merge them into one category.
+    eco_names = sorted({info.loc[o, "ECO_NAME"] for o in present})
+    eco_id = {n: k + 1 for k, n in enumerate(eco_names)}
+    remap = np.zeros(int(raw.max()) + 1, dtype="<u2")
+    eco_biome: dict[str, str] = {}
+    for o in present:
+        remap[o] = eco_id[info.loc[o, "ECO_NAME"]]
+        eco_biome[info.loc[o, "ECO_NAME"]] = info.loc[o, "BIOME_NAME"]
+    grid = remap[raw]
+    ecoregions = [
+        {"id": eco_id[n], "code": n, "name": n, "group": eco_biome[n], "color": biome_color[eco_biome[n]]}
+        for n in eco_names
+    ]
+    lookup = [0] * (len(eco_names) + 1)
+    for n in eco_names:
+        lookup[eco_id[n]] = biome_id[eco_biome[n]]
+    print(f"  ecoregions: {len(ecoregions)} ecoregions in {len(biomes)} biomes")
+    return grid, ecoregions, biomes, lookup
+
+
+def block_reduce_aligned(path: str, factor: int, reducer: str, nodata_test) -> np.ndarray:
+    """Reduce a fine raster aligned with the grid (factor x factor pixels per cell), in strips."""
+    out = np.full((ROWS, COLS), np.nan, dtype="float32")
+    with rasterio.open(path) as src:
+        res = src.res[0]
+        assert abs(res * factor - RES) < 1e-9, (res, factor)
+        col0 = round((WEST - src.bounds.left) / res)
+        strip = max(1, 200 // factor)  # grid rows per read (keeps memory to a few hundred MB)
+        for r0 in range(0, ROWS, strip):
+            r1 = min(ROWS, r0 + strip)
+            north = NORTH - r0 * RES
+            row0 = round((src.bounds.top - north) / res)
+            # Rows outside the source raster (e.g. north of 80 degrees) stay empty.
+            lo, hi = max(row0, 0), min(row0 + (r1 - r0) * factor, src.height)
+            if hi <= lo:
+                continue
+            win = Window(col0, lo, COLS * factor, hi - lo)
+            a = src.read(1, window=win, boundless=True, fill_value=src.nodata if src.nodata is not None else 0)
+            pad_top = lo - row0
+            full = np.empty(((r1 - r0) * factor, COLS * factor), dtype=a.dtype)
+            full[:] = src.nodata if src.nodata is not None else 0
+            full[pad_top:pad_top + a.shape[0]] = a
+            blocks = full.reshape(r1 - r0, factor, COLS, factor).swapaxes(1, 2).reshape(r1 - r0, COLS, factor * factor)
+            bad = nodata_test(blocks)
+            if reducer == "mean":
+                total = np.where(bad, 0, blocks).sum(axis=2, dtype="uint32")
+                n = (~bad).sum(axis=2)
+                with np.errstate(invalid="ignore", divide="ignore"):
+                    out[r0:r1] = np.where(n > factor * factor // 10, total / np.maximum(n, 1), np.nan)
+            else:  # range = max - min
+                hi_v = np.where(bad, np.iinfo(blocks.dtype).min, blocks).max(axis=2)
+                lo_v = np.where(bad, np.iinfo(blocks.dtype).max, blocks).min(axis=2)
+                ok = (~bad).any(axis=2)
+                out[r0:r1] = np.where(ok, hi_v.astype("float32") - lo_v, np.nan)
+    return out
+
+
+def build_tree_cover() -> np.ndarray:
+    """Percent of land covered by trees (Copernicus Global Land Cover 100 m, 2019), per cell."""
+    return block_reduce_aligned(
+        str(RAW / "copernicus_tree_cover_2019.tif"), 84, "mean", lambda b: b > 100  # 255 = no data / water
+    )
+
+
+def build_ruggedness() -> np.ndarray:
+    """Elevation range (highest minus lowest ground, metres) within each cell, from ~1 km WorldClim elevation."""
+    tif = RAW / "wc2.1_30s_elev.tif"
+    if not tif.exists():  # random access inside a zip is slow; extract once
+        import zipfile
+
+        with zipfile.ZipFile(RAW / "wc2.1_30s_elev.zip") as z:
+            z.extract("wc2.1_30s_elev.tif", RAW)
+    return block_reduce_aligned(str(tif), 10, "range", lambda b: b == -32768)
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -405,6 +507,43 @@ def main() -> None:
             "variants": variants,
             "min": min(v["min"] for v in variants),
             "max": max(v["max"] for v in variants),
+        }
+    )
+
+    print("landscape")
+    eco_grid, ecoregions, biomes, lookup = build_ecoregions(mask)
+    eco_file = write_gz("ecoregion", eco_grid.astype("<u2"))
+    layers.append(
+        {
+            "id": "biome", "name": "Biome", "group": "Landscape", "type": "categorical",
+            "description": "Broad natural vegetation zone. Tick biomes to limit results to them; none ticked means any.",
+            "file": eco_file, "dtype": "uint16", "lookup": lookup, "colorable": True,
+            "categories": biomes, "source": "RESOLVE Ecoregions 2017",
+        }
+    )
+    layers.append(
+        {
+            "id": "ecoregion", "name": "Ecoregion", "group": "Landscape", "type": "categorical",
+            "description": "Finer natural regions, grouped by biome. Tick ecoregions to limit results to them.",
+            "file": eco_file, "dtype": "uint16", "categories": ecoregions, "source": "RESOLVE Ecoregions 2017",
+        }
+    )
+    layers.append(
+        {
+            "id": "tree_cover", "name": "Tree cover",
+            "description": "Share of the land covered by trees (2019, from 100 m satellite land cover).",
+            "group": "Landscape", "type": "numeric", "unit": "share", "colormap": "trees",
+            "source": "Copernicus Global Land Cover 2019",
+            **numeric_layer("tree_cover", build_tree_cover(), mask, scale=0.1),
+        }
+    )
+    layers.append(
+        {
+            "id": "ruggedness", "name": "Ruggedness",
+            "description": "Elevation range within each ~9 km cell: under ~300 ft is flat, several thousand ft is mountainous.",
+            "group": "Landscape", "type": "numeric", "unit": "m", "colormap": "elevation",
+            "source": "WorldClim 2.1 elevation, 30 arc-seconds",
+            **numeric_layer("ruggedness", build_ruggedness(), mask, scale=1),
         }
     )
 

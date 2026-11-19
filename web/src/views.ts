@@ -15,6 +15,8 @@ export interface ViewState {
   layers: Record<string, boolean>;
   filters: Record<string, FilterState>;
   countries: string[];
+  /** Selected categories per category layer (e.g. biome names), by layer id. */
+  cats?: Record<string, string[]>;
   /** Towns whose cards are pinned (town ids). */
   pins?: string[];
   /** Legacy (before town filters): minimum town population. Read on load, no longer written. */

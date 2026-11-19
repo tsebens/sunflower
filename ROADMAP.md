@@ -26,15 +26,11 @@ internet speed. See the README for sources.
 
 ## Biome / landscape type
 
-Candidate category layers (filterable like Country):
-- **Ecoregions / biomes:** RESOLVE Ecoregions 2017 (Dinerstein et al.), 846 ecoregions
-  in 14 biomes, global, CC BY 4.0. Names like "Central Pacific coastal forests" or
-  "Snake-Columbia shrub steppe".
-- **Köppen-Geiger climate class:** Beck et al. 2023, 1 km, global (e.g. "Csb: warm-summer
-  Mediterranean", "Dfb: warm-summer humid continental").
-- **Land cover:** ESA WorldCover 2021 (10 m, global): share of each cell that is
-  forest, grassland, shrubland, cropland, bare rock and so on.
-- **Ruggedness:** terrain ruggedness or local relief computed from elevation.
+Done: biome and ecoregion (RESOLVE 2017), tree cover, ruggedness. Possible additions:
+- **Köppen-Geiger climate class** (Beck et al. 2023, 1 km): one-word climate type.
+- **Bare ground / rock share** (Copernicus 100 m bare-cover fraction), for "rocky" more
+  directly than ruggedness.
+- **Water nearby**: share of lakes and rivers within a few miles.
 
 ## Natural hazards
 

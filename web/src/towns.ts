@@ -557,7 +557,7 @@ export class Towns {
         ${usSections}
         <h4>Getting around</h4>
         <table>${row("Nearest airport with scheduled flights", c.airport[i] ? `${esc(c.airport[i]!)}, ${dist}` : NA)}</table>
-        <h4>Climate here</h4>
+        <h4>Climate &amp; landscape here</h4>
         <table>${this.opts.climateRows(c.lon[i], c.lat[i])}</table>
         <h4>About</h4>
         <div class="tc-wiki">Looking up Wikipedia…</div>

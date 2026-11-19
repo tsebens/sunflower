@@ -1,6 +1,6 @@
 // Catalog types and binary layer loading.
 
-export type Unit = "degC" | "mm" | "km" | "m" | "hours" | "Mbps" | "zone" | "people" | "usd" | "pct";
+export type Unit = "degC" | "mm" | "km" | "m" | "hours" | "Mbps" | "zone" | "people" | "usd" | "pct" | "share";
 
 export interface Grid {
   west: number;
@@ -18,6 +18,8 @@ export interface Category {
   code: string;
   name: string;
   group: string;
+  /** Display colour (hex), e.g. for biomes. */
+  color?: string;
 }
 
 interface Quantized {
@@ -53,9 +55,16 @@ export interface NumericLayerDef extends Partial<Quantized> {
 export interface CategoricalLayerDef {
   id: string;
   name: string;
+  description?: string;
   group: string;
   type: "categorical";
   file: string;
+  /** Storage type of the file (default uint8). */
+  dtype?: "uint8" | "uint16";
+  /** Maps stored values to category ids, when several layers share one file (ecoregion -> biome). */
+  lookup?: number[];
+  /** Offered under "Colour the map by", using each category's colour. */
+  colorable?: boolean;
   source: string;
   categories: Category[];
 }
@@ -97,6 +106,10 @@ export async function loadBytes(file: string): Promise<ArrayBuffer> {
 
 export async function loadInt16(file: string): Promise<Int16Array> {
   return new Int16Array(await loadBytes(file));
+}
+
+export async function loadUint16(file: string): Promise<Uint16Array> {
+  return new Uint16Array(await loadBytes(file));
 }
 
 export async function loadUint8(file: string): Promise<Uint8Array> {

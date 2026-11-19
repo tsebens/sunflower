@@ -280,3 +280,8 @@ select, .search {
 #exaggeration-row:not([hidden]) { display: grid; gap: 4px; }
 #exaggeration { width: 100%; accent-color: var(--accent); }
 .group-note { margin: -4px 16px 10px; }
+
+.legend-cat { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; font-size: 12px; margin: 2px 0; }
+.legend-share { color: var(--muted); }
+.cat .swatch.small { flex: none; }
+.maplibregl-popup-content td.wrap, .town-card td.wrap { white-space: normal; text-align: right; max-width: 170px; }

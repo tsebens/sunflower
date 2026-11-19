@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch the raw source datasets into data/raw (about 3.5 GB, mostly daily temperatures
+# Fetch the raw source datasets into data/raw (about 10 GB, mostly daily temperatures
 # for growing zones; data/raw/cpc can be deleted once build.py has cached its result).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -23,6 +23,11 @@ get $NE/physical/ne_10m_lakes.zip
 get https://crudata.uea.ac.uk/cru/data/hrg/tmc/grid_10min_sunp.dat.gz
 # Ookla Open Data: fixed broadband speed tiles for one quarter.
 get "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2026/quarter=3/2026-07-01_performance_fixed_tiles.parquet" ookla_fixed_2026q3.parquet
+# Landscape: RESOLVE Ecoregions 2017, ~1 km elevation (ruggedness), Copernicus tree cover
+# (100 m, 5.6 GB; once build.py has run it can be deleted).
+get https://storage.googleapis.com/teow2016/Ecoregions2017.zip ecoregions2017.zip
+get https://geodata.ucdavis.edu/climate/worldclim/2_1/base/wc2.1_30s_elev.zip
+get "https://zenodo.org/api/records/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Tree-CoverFraction-layer_EPSG-4326.tif/content" copernicus_tree_cover_2019.tif
 # Towns: US Census places (ACS 2020-24 5-year tables, gazetteers), Zillow home values,
 # GeoNames towns, OurAirports.
 ACS=https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData

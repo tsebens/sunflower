@@ -46,6 +46,10 @@ raw datasets ──► pipeline/build.py ──► web/public/data/*.bin.gz + ca
   non-commercial use) under the data overlay. Turning it on lowers the overlay
   opacity to 40% so the imagery shows through; drag opacity to 0% to see only the
   imagery.
+* **Landscape** filters: **Biome** (e.g. temperate conifer forest, deserts & xeric
+  shrublands) and the finer **Ecoregion** (e.g. "Cascade Mountains leeward forests"),
+  plus **Tree cover** and **Ruggedness** sliders. "Colour the map by → Biome" paints
+  the biomes with a legend of their share of the matching area.
 * **Click** anywhere to see all values for that spot. If the spot doesn't match,
   the values that break your filters are shown in red.
 * **Towns.** Click a town to see its card: population and growth,
@@ -92,7 +96,7 @@ so the data pipeline is only needed when adding or changing layers.
 ### Rebuilding the data with Docker
 
 ```bash
-docker compose run --rm pipeline   # downloads ~3 GB into data/raw the first time
+docker compose run --rm pipeline   # downloads ~10 GB into data/raw the first time
 docker compose up --build -d       # bake the new data into the app
 ```
 
@@ -109,7 +113,7 @@ Rebuilding the data:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r pipeline/requirements.txt
-pipeline/download.sh             # ~3 GB into data/raw (git-ignored)
+pipeline/download.sh             # ~10 GB into data/raw (git-ignored)
 .venv/bin/python pipeline/build.py   # map layers
 .venv/bin/python pipeline/towns.py   # towns and their statistics
 ```
@@ -153,6 +157,9 @@ derived from open datasets, so that's harmless here.
 | Distance to the ocean | Natural Earth 1:10m coastline | Straight-line (great-circle) distance |
 | Distance to a major city | Natural Earth 1:10m populated places (`POP_MAX`, ≈ metro population) | Straight-line distance. Natural Earth misses some smaller cities, so the 100k+ option is the least complete. |
 
+| Biome, Ecoregion | [RESOLVE Ecoregions 2017](https://ecoregions.appspot.com/) (Dinerstein et al. 2017), CC BY 4.0 | 202 ecoregions in 14 biomes across the mapped region; "Rock & Ice" given its own biome. Biome can also colour the map |
+| Tree cover | [Copernicus Global Land Cover 100 m](https://zenodo.org/records/3939050), 2019 | Average tree-cover fraction of each cell's land |
+| Ruggedness | WorldClim 2.1 elevation, 30 arc-seconds (~1 km) | Highest minus lowest 1 km elevation within each ~9 km cell |
 | Home internet speed | [Ookla Open Data](https://github.com/teamookla/ookla-open-data) fixed broadband, Q3 2026 | Test-weighted geometric mean download speed; cells with fewer than 10 tests are left empty |
 
 ### Towns

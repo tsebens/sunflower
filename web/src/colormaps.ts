@@ -15,6 +15,8 @@ const RAMPS: Record<string, string[]> = {
   elevation: ["#3f7f4f", "#8db86a", "#e3dc96", "#d1ab70", "#a87a55", "#7b5a4a"],
   // Magma: slow = dark, fast = bright.
   speed: ["#1c1044", "#4f127b", "#812581", "#b5367a", "#e55064", "#fb8761", "#fec287", "#fcfdbf"],
+  // Bare to dense forest.
+  trees: ["#f1ead0", "#d6e2a8", "#a9cd7f", "#72b05b", "#3f8c45", "#1d6634", "#0b3f23"],
   // Viridis.
   distance: ["#440154", "#482878", "#3e4989", "#31688e", "#26828e", "#1f9e89", "#35b779", "#6ece58", "#b5de2b", "#fde725"],
 };

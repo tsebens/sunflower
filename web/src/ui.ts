@@ -160,8 +160,12 @@ export function categoryCard(layer: CategoricalLayer, onChange: () => void): Car
   head.append(el("span", "card-title", layer.def.name), value, reset);
   const search = el("input", "search");
   search.type = "search";
-  search.placeholder = "Search countries…";
-  card.append(head, el("p", "card-desc", "Tick countries to limit results to them. None ticked means anywhere."), search);
+  search.placeholder = `Search ${layer.def.name.toLowerCase()}s…`;
+  const desc = layer.def.description ?? "Tick countries to limit results to them. None ticked means anywhere.";
+  card.append(head, el("p", "card-desc", desc));
+  // A search box only helps for long lists.
+  if (layer.def.categories.length > 20) card.append(search);
+  const grouped = new Set(layer.def.categories.map((c) => c.group)).size > 1;
 
   const boxes = new Map<number, HTMLInputElement>();
   const rows: { row: HTMLElement; name: string }[] = [];
@@ -173,7 +177,7 @@ export function categoryCard(layer: CategoricalLayer, onChange: () => void): Car
     const all = el("button", "link", "all");
     const none = el("button", "link", "none");
     gh.append(el("strong", undefined, g), all, none);
-    list.append(gh);
+    if (grouped || cats.length > 6) list.append(gh);
     const setAll = (on: boolean) => {
       for (const c of cats) on ? layer.selected.add(c.id) : layer.selected.delete(c.id);
       onChange();
@@ -189,7 +193,13 @@ export function categoryCard(layer: CategoricalLayer, onChange: () => void): Car
         onChange();
       };
       boxes.set(c.id, box);
-      row.append(box, document.createTextNode(c.name));
+      row.append(box);
+      if (c.color) {
+        const sw = el("span", "swatch small");
+        sw.style.background = c.color;
+        row.append(sw);
+      }
+      row.append(document.createTextNode(c.name));
       rows.push({ row, name: c.name.toLowerCase() });
       list.append(row);
     }
