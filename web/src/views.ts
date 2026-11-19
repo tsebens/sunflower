@@ -15,6 +15,11 @@ export interface ViewState {
   layers: Record<string, boolean>;
   filters: Record<string, FilterState>;
   countries: string[];
+  /** Towns whose cards are pinned (town ids). */
+  pins?: string[];
+  townMinPop?: number;
+  terrain3d?: boolean;
+  exaggeration?: number;
 }
 
 interface SavedView {

@@ -6,8 +6,9 @@ import "./style.css";
 import { basemapStyle, GRID_BEFORE, REFERENCE_LAYERS, setReferenceVisible } from "./basemap";
 import { lut, MATCH_COLOR, rampStops, solid } from "./colormaps";
 import { loadBands, loadCatalog, loadUint8, type CategoricalLayerDef, type NumericLayerDef } from "./data";
-import { band, BINS, Engine, type NumericLayer, type Result } from "./engine";
+import { band, BINS, Engine, isActive, type NumericLayer, type Result } from "./engine";
 import { GridOverlay } from "./overlay";
+import { loadTowns, Towns } from "./towns";
 import { categoryCard, group, numericCard, type Card } from "./ui";
 import { fmt, settings } from "./units";
 import { decodeState, encodeState, stateKey, viewsPanel, type FilterState, type ViewState } from "./views";
@@ -32,6 +33,7 @@ async function boot() {
   const numericDefs = catalog.layers.filter((l): l is NumericLayerDef => l.type === "numeric");
 
   summary.textContent = `Loading ${catalog.layers.length} layers…`;
+  const townsPromise = loadTowns();
   const [countryValues, ...bandSets] = await Promise.all([
     loadUint8(countryDef.file),
     ...numericDefs.map(loadBands),
@@ -59,11 +61,28 @@ async function boot() {
     zoom: 2,
     attributionControl: { compact: true },
   });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   const scale = new maplibregl.ScaleControl({ unit: "imperial" });
   map.addControl(scale, "bottom-right");
   await new Promise<void>((r) => map.once("load", () => r()));
+  // Exposed for debugging in the browser console and for automated UI tests.
+  (window as unknown as { sunflowerMap: maplibregl.Map }).sunflowerMap = map;
   const overlay = new GridOverlay(map, catalog.grid, GRID_BEFORE);
+  const layerById = (id: string) => numeric.find((l) => l.def.id === id);
+  const towns = new Towns(map, await townsPromise, {
+    dark,
+    imperial: () => settings.imperial,
+    onPinsChange: () => schedule(),
+    climateRows(lon, lat) {
+      const i = engine.cellAt(lon, lat);
+      const ids = ["temp_max", "temp_min", "precip_annual", "dewpoint_summer", "sunshine_hours", "hardiness_zone", "elevation", "dist_coast"];
+      return ids
+        .map((id) => layerById(id))
+        .filter((l): l is NumericLayer => !!l)
+        .map((l) => `<tr><th>${l.def.name}</th><td>${i < 0 ? "n/a" : fmt(engine.valueAt(l, band(l), i), l.def.unit)}</td></tr>`)
+        .join("");
+    },
+  });
 
   // ---- sidebar: display ------------------------------------------------------
   const vizSelect = $<HTMLSelectElement>("viz-select");
@@ -74,6 +93,9 @@ async function boot() {
   const imperial = $<HTMLInputElement>("imperial");
   const opacity = $<HTMLInputElement>("opacity");
   const opacityValue = $("opacity-value");
+  const townMinPop = $<HTMLSelectElement>("town-min-pop");
+  const terrain3d = $<HTMLInputElement>("terrain3d");
+  const exaggeration = $<HTMLInputElement>("exaggeration");
 
   const refToggles = new Map<string, HTMLInputElement>();
   for (const ref of REFERENCE_LAYERS) {
@@ -131,6 +153,10 @@ async function boot() {
       layers: Object.fromEntries([...refToggles].map(([k, b]) => [k, b.checked])),
       filters: f,
       countries: countryDef.categories.filter((c) => engine.country.selected.has(c.id)).map((c) => c.code),
+      pins: towns.pinnedIds().sort(),
+      townMinPop: Number(townMinPop.value),
+      terrain3d: terrain3d.checked,
+      exaggeration: Number(exaggeration.value),
     };
   }
 
@@ -139,6 +165,11 @@ async function boot() {
     if (typeof s.showExcluded === "boolean") showExcluded.checked = s.showExcluded;
     if (typeof s.imperial === "boolean") imperial.checked = s.imperial;
     if (typeof s.opacity === "number") opacity.value = String(s.opacity);
+    if (typeof s.townMinPop === "number" && [...townMinPop.options].some((o) => Number(o.value) === s.townMinPop))
+      townMinPop.value = String(s.townMinPop);
+    terrain3d.checked = s.terrain3d === true;
+    if (typeof s.exaggeration === "number") exaggeration.value = String(s.exaggeration);
+    towns.setPinned(Array.isArray(s.pins) ? s.pins : []);
     for (const [k, box] of refToggles) {
       const on = s.layers?.[k];
       if (typeof on === "boolean") box.checked = on;
@@ -163,12 +194,28 @@ async function boot() {
     setState({ ...s, filters: {}, countries: [] });
   }
 
+  let terrainOn = false;
+  function applyTerrain() {
+    const on = terrain3d.checked;
+    const ex = Number(exaggeration.value);
+    $("exaggeration-row").hidden = !on;
+    $("exaggeration-value").textContent = `${ex}×`;
+    if (on) map.setTerrain({ source: "terrain3d", exaggeration: ex });
+    else if (terrainOn) map.setTerrain(null);
+    // Tilt the camera when turning 3D on (and flatten when turning it off) so the change is visible.
+    if (on && !terrainOn && map.getPitch() < 20) map.easeTo({ pitch: 55, duration: 800 });
+    if (!on && terrainOn) map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+    terrainOn = on;
+  }
+
   function applyDisplay() {
     settings.imperial = imperial.checked;
     scale.setUnit(imperial.checked ? "imperial" : "metric");
     overlay.setOpacity(Number(opacity.value) / 100);
     opacityValue.textContent = `${opacity.value}%`;
     for (const [k, box] of refToggles) setReferenceVisible(map, k, box.checked);
+    towns.setMinPop(Number(townMinPop.value));
+    applyTerrain();
   }
 
   const defaults = stateKey(getState());
@@ -232,6 +279,11 @@ async function boot() {
   showExcluded.onchange = schedule;
   imperial.onchange = () => {
     applyDisplay();
+    towns.refreshCards();
+    schedule();
+  };
+  townMinPop.onchange = terrain3d.onchange = exaggeration.oninput = () => {
+    applyDisplay();
     schedule();
   };
   opacity.oninput = () => {
@@ -250,16 +302,36 @@ async function boot() {
     clickTimer = window.setTimeout(() => inspect(e), 250);
   });
   function inspect(e: maplibregl.MapMouseEvent) {
+    // Clicking a town opens its card (and keeps it open) instead of the area details.
+    const t = towns.townAt(e.point);
+    if (t >= 0) {
+      popup.remove();
+      towns.showCard(t, true);
+      return;
+    }
+    towns.closeCard();
     const i = engine.cellAt(e.lngLat.lng, e.lngLat.lat);
     if (i < 0 || engine.country.values[i] === 0) return;
-    const cat = countryDef.categories.find((c) => c.id === engine.country.values[i]);
-    const rows = [`<tr><th>Country</th><td>${cat?.name ?? "?"}</td></tr>`];
+    const fail = (bad: boolean, value: string, why: string) =>
+      bad ? `<span class="fail" title="${why}">${value}</span>` : value;
+
+    const cid = engine.country.values[i];
+    const cat = countryDef.categories.find((c) => c.id === cid);
+    const countryFails = engine.country.selected.size > 0 && !engine.country.selected.has(cid);
+    const rows = [`<tr><th>Country</th><td>${fail(countryFails, cat?.name ?? "?", "Not one of your selected countries")}</td></tr>`];
+    let failures = countryFails ? 1 : 0;
     for (const l of numeric) {
       const b = band(l);
+      const v = engine.valueAt(l, b, i);
+      const bad = isActive(l) && (!Number.isFinite(v) || v < l.lo || v > l.hi);
+      if (bad) failures++;
       const label = l.def.variants ? `${l.def.name} (${b.label})` : l.def.name;
-      rows.push(`<tr><th>${label}</th><td>${fmt(engine.valueAt(l, b, i), l.def.unit)}</td></tr>`);
+      const why = `Your filter: ${fmt(l.lo, l.def.unit)} – ${fmt(l.hi, l.def.unit)}`;
+      rows.push(`<tr${bad ? ' class="fail-row"' : ""}><th>${label}</th><td>${fail(bad, fmt(v, l.def.unit), why)}</td></tr>`);
     }
-    const match = last?.pass[i] ? `<div class="pop-match yes">Matches your filters</div>` : `<div class="pop-match">Doesn't match your filters</div>`;
+    const match = last?.pass[i]
+      ? `<div class="pop-match yes">Matches your filters</div>`
+      : `<div class="pop-match">Doesn't match your filters${failures ? ` <span class="fail">(${failures} in red)</span>` : ""}</div>`;
     const at = `${Math.abs(e.lngLat.lat).toFixed(2)}°${e.lngLat.lat >= 0 ? "N" : "S"}, ${Math.abs(e.lngLat.lng).toFixed(2)}°${e.lngLat.lng >= 0 ? "E" : "W"}`;
     popup.setLngLat(e.lngLat).setHTML(`${match}<table>${rows.join("")}</table><div class="pop-at">${at}</div>`).addTo(map);
   }

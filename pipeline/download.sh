@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch the raw source datasets into data/raw (about 3 GB, mostly daily temperatures
+# Fetch the raw source datasets into data/raw (about 3.5 GB, mostly daily temperatures
 # for growing zones; data/raw/cpc can be deleted once build.py has cached its result).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -23,6 +23,19 @@ get $NE/physical/ne_10m_lakes.zip
 get https://crudata.uea.ac.uk/cru/data/hrg/tmc/grid_10min_sunp.dat.gz
 # Ookla Open Data: fixed broadband speed tiles for one quarter.
 get "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2026/quarter=3/2026-07-01_performance_fixed_tiles.parquet" ookla_fixed_2026q3.parquet
+# Towns: US Census places (ACS 2020-24 5-year tables, gazetteers), Zillow home values,
+# GeoNames towns, OurAirports.
+ACS=https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData
+mkdir -p acs
+for t in b01002 b01003 b19013 b25077 b25064 b23025 b17001 b15003 b25003 b08301; do
+  get "$ACS/acsdt5y2024-$t.dat" "acs/$t.dat"
+done
+get https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_place_national.zip gaz_place_2024.zip
+get https://www2.census.gov/geo/docs/maps-data/data/gazetteer/Gaz_places_national.zip gaz_place_2010.zip
+get https://files.zillowstatic.com/research/public_csvs/zhvi/City_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv zillow_city_zhvi.csv
+get https://download.geonames.org/export/dump/cities1000.zip geonames_cities1000.zip
+get https://download.geonames.org/export/dump/admin1CodesASCII.txt geonames_admin1.txt
+get https://davidmegginson.github.io/ourairports-data/airports.csv ourairports.csv
 # NOAA CPC global daily minimum temperature, 0.5 deg, 1991-2020 (USDA zone normal period).
 export -f get
 seq 1991 2020 | xargs -P 4 -I{} bash -c 'get https://downloads.psl.noaa.gov/Datasets/cpc_global_temp/tmin.{}.nc cpc/tmin.{}.nc'

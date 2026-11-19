@@ -82,7 +82,7 @@ export async function loadCatalog(): Promise<Catalog> {
   return res.json();
 }
 
-async function loadBytes(file: string): Promise<ArrayBuffer> {
+export async function loadBytes(file: string): Promise<ArrayBuffer> {
   const res = await fetch(`${DATA_URL}${file}`);
   if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();

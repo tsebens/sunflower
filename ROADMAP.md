@@ -51,6 +51,17 @@ These come as polygons (county / province / country), not grids. The pipeline
 will need a "rasterize polygons + attribute table" helper, much like the existing
 country layer.
 
+## Towns
+
+- **Canada statistics.** Statistics Canada 2021 Census profile by census subdivision
+  (income, dwelling values, age, education) to match the US cards.
+- **Europe statistics.** Eurostat LAU/NUTS 3 indicators (population change,
+  unemployment, GDP per head) are the most consistent option; detail varies by country.
+- **More US card items.** BEA regional price parities (overall cost of living by
+  metro/state), electricity price (EIA, by state), job growth (BLS QCEW, by county),
+  hospital distance (CMS hospital list).
+- **Filter by town stats.** For example "only towns where homes are under $400k".
+
 ## Ambitious / later
 
 - **Local sun shading from terrain.** Hours of direct sun per cell, from sun
