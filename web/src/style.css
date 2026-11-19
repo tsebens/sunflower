@@ -49,10 +49,54 @@ button { font: inherit; color: inherit; }
 header { padding: 16px 16px 8px; }
 h1 { margin: 0 0 4px; font-size: 20px; }
 #summary { margin: 0 0 8px; color: var(--muted); min-height: 2.8em; }
-.units, .inline { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+.inline { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
 
-.viz { padding: 8px 16px 12px; display: grid; gap: 6px; border-bottom: 1px solid var(--line); }
-.viz > label:first-child { font-weight: 600; }
+.panel { padding: 0 16px 14px; }
+.display { display: grid; gap: 7px; }
+.field-label { font-weight: 600; margin-top: 4px; }
+.field-label span { font-weight: 400; color: var(--muted); }
+.toggles { display: grid; gap: 3px; }
+.hint { color: var(--muted); font-size: 12px; }
+#opacity { width: 100%; accent-color: var(--accent); }
+
+.btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn:hover { filter: brightness(1.08); }
+.views-form { display: flex; gap: 6px; margin-bottom: 8px; }
+.views-form .search { flex: 1; min-width: 0; }
+.views-list { display: grid; gap: 4px; }
+.views-empty { color: var(--muted); font-size: 13px; margin: 2px 0; }
+.view-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.view-row.current { border-color: var(--accent); background: var(--accent-soft); }
+.view-name {
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view-row.current .view-name { font-weight: 600; }
+.view-del { border: 0; background: none; color: var(--muted); padding: 4px 10px; cursor: pointer; font-size: 16px; }
+.view-del:hover { color: #c0392b; }
+.views-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; }
+.views-status { min-height: 1.2em; margin: 6px 0 0; color: var(--accent); font-size: 12.5px; }
 select, .search {
   width: 100%;
   padding: 6px 8px;

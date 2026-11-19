@@ -62,8 +62,11 @@ country layer.
   worthwhile.
 - **Soft preferences / scoring.** Beyond hard cut-offs: give each preference a
   weight and colour the map by how well each place fits overall.
-- **Shareable state.** Store the filters in the URL so a view can be bookmarked
-  or sent to someone.
+- **County borders at every zoom.** The basemap tiles only include counties
+  from about zoom 9. Showing them earlier would need our own simplified boundary
+  file (US Census counties, Statistics Canada census divisions, Eurostat NUTS 3).
+- **Saved views shared between devices.** Views currently live in each browser.
+  A small backend (or a JSON file in the repo) could sync them.
 - **Drive time** to cities instead of straight-line distance (needs a road
   network; heavy).
 - **Fresher climate data.** WorldClim covers 1970–2000; CHELSA or TerraClimate
