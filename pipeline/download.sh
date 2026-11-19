@@ -1,16 +1,28 @@
 #!/usr/bin/env bash
-# Fetch the raw source datasets into data/raw (about 200 MB, mostly WorldClim).
+# Fetch the raw source datasets into data/raw (about 3 GB, mostly daily temperatures
+# for growing zones; data/raw/cpc can be deleted once build.py has cached its result).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-mkdir -p data/raw && cd data/raw
-urls=(
-  https://geodata.ucdavis.edu/climate/worldclim/2_1/base/wc2.1_5m_bio.zip
-  https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_countries.zip
-  https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places.zip
-  https://naciscdn.org/naturalearth/10m/physical/ne_10m_coastline.zip
-  https://naciscdn.org/naturalearth/10m/physical/ne_10m_lakes.zip
-)
-for u in "${urls[@]}"; do
-  f=$(basename "$u")
-  if [[ -f "$f" ]]; then echo "have $f"; else echo "get  $f"; curl -fL --retry 3 -o "$f" "$u"; fi
-done
+mkdir -p data/raw/cpc && cd data/raw
+
+get() {  # get URL [output-path]
+  local out=${2:-$(basename "$1")}
+  if [[ -f "$out" ]]; then echo "have $out"; else echo "get  $out"; curl -fL --retry 3 -o "$out.part" "$1" && mv "$out.part" "$out"; fi
+}
+
+WC=https://geodata.ucdavis.edu/climate/worldclim/2_1/base
+NE=https://naciscdn.org/naturalearth/10m
+get $WC/wc2.1_5m_bio.zip
+get $WC/wc2.1_5m_vapr.zip
+get $WC/wc2.1_5m_elev.zip
+get $NE/cultural/ne_10m_admin_0_countries.zip
+get $NE/cultural/ne_10m_populated_places.zip
+get $NE/physical/ne_10m_coastline.zip
+get $NE/physical/ne_10m_lakes.zip
+# CRU CL 2.0 monthly sunshine percentage (1961-90 normals, 10').
+get https://crudata.uea.ac.uk/cru/data/hrg/tmc/grid_10min_sunp.dat.gz
+# Ookla Open Data: fixed broadband speed tiles for one quarter.
+get "https://ookla-open-data.s3.amazonaws.com/parquet/performance/type=fixed/year=2026/quarter=3/2026-07-01_performance_fixed_tiles.parquet" ookla_fixed_2026q3.parquet
+# NOAA CPC global daily minimum temperature, 0.5 deg, 1991-2020 (USDA zone normal period).
+export -f get
+seq 1991 2020 | xargs -P 4 -I{} bash -c 'get https://downloads.psl.noaa.gov/Datasets/cpc_global_temp/tmin.{}.nc cpc/tmin.{}.nc'

@@ -1,0 +1,19 @@
+services:
+  # The app: `docker compose up --build`, then open http://localhost:8080
+  web:
+    build: .
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  # Optional: rebuild the data layers (only needed when adding/changing layers).
+  #   docker compose run --rm pipeline
+  # Downloads ~3 GB into data/raw on the first run, then writes web/public/data.
+  # Afterwards run `docker compose up --build` again to bake the new data into the app.
+  pipeline:
+    profiles: [pipeline]
+    build:
+      context: .
+      dockerfile: docker/pipeline.Dockerfile
+    volumes:
+      - .:/work
