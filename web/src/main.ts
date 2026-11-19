@@ -93,7 +93,6 @@ async function boot() {
   const imperial = $<HTMLInputElement>("imperial");
   const opacity = $<HTMLInputElement>("opacity");
   const opacityValue = $("opacity-value");
-  const townMinPop = $<HTMLSelectElement>("town-min-pop");
   const terrain3d = $<HTMLInputElement>("terrain3d");
   const exaggeration = $<HTMLInputElement>("exaggeration");
 
@@ -131,6 +130,14 @@ async function boot() {
     cards.push(...gc);
     filters.append(group(g, true, gc));
   }
+  // Town filters: decide which towns are drawn (separately from the area colouring).
+  const townCards = towns.filters.map((l) => numericCard(l, () => schedule()));
+  cards.push(...townCards);
+  const townGroup = group("Town filters", true, townCards);
+  const townCount = document.createElement("p");
+  townCount.className = "card-desc group-note";
+  townGroup.querySelector("summary")!.after(townCount);
+  filters.append(townGroup);
 
   const sources = [...new Set(catalog.layers.map((l) => l.source.replace(/ BIO\d+$/, "")))];
   $("sources").innerHTML = `<strong>Data:</strong> ${sources.join(" · ")}. Basemap: OpenFreeMap / OpenMapTiles, © OpenStreetMap contributors. Terrain: Mapzen / AWS Terrain Tiles.`;
@@ -145,6 +152,12 @@ async function boot() {
       if (l.def.variants && l.bandIndex !== defaultBand(l.def)) s.band = band(l).key;
       if (Object.keys(s).length) f[l.def.id] = s;
     }
+    for (const l of towns.filters) {
+      const s: FilterState = {};
+      if (l.lo !== (l.defaultLo ?? l.def.min)) s.lo = Number(l.lo.toPrecision(6));
+      if (l.hi < l.def.max) s.hi = Number(l.hi.toPrecision(6));
+      if (Object.keys(s).length) f[l.def.id] = s;
+    }
     return {
       viz: vizSelect.value,
       showExcluded: showExcluded.checked,
@@ -154,7 +167,6 @@ async function boot() {
       filters: f,
       countries: countryDef.categories.filter((c) => engine.country.selected.has(c.id)).map((c) => c.code),
       pins: towns.pinnedIds().sort(),
-      townMinPop: Number(townMinPop.value),
       terrain3d: terrain3d.checked,
       exaggeration: Number(exaggeration.value),
     };
@@ -165,8 +177,6 @@ async function boot() {
     if (typeof s.showExcluded === "boolean") showExcluded.checked = s.showExcluded;
     if (typeof s.imperial === "boolean") imperial.checked = s.imperial;
     if (typeof s.opacity === "number") opacity.value = String(s.opacity);
-    if (typeof s.townMinPop === "number" && [...townMinPop.options].some((o) => Number(o.value) === s.townMinPop))
-      townMinPop.value = String(s.townMinPop);
     terrain3d.checked = s.terrain3d === true;
     if (typeof s.exaggeration === "number") exaggeration.value = String(s.exaggeration);
     towns.setPinned(Array.isArray(s.pins) ? s.pins : []);
@@ -182,6 +192,15 @@ async function boot() {
       l.hi = clamp(f.hi, l.def.max);
       const bi = l.bands.findIndex((b) => b.key === f.band);
       l.bandIndex = bi >= 0 ? bi : defaultBand(l.def);
+    }
+    for (const l of towns.filters) {
+      const f = s.filters?.[l.def.id] ?? {};
+      const clamp = (v: unknown, fallback: number) =>
+        typeof v === "number" && Number.isFinite(v) ? Math.min(l.def.max, Math.max(l.def.min, v)) : fallback;
+      // Views saved before town filters existed stored only a minimum population.
+      const legacyLo = l.def.id === "town_pop" && typeof s.townMinPop === "number" ? s.townMinPop : undefined;
+      l.lo = clamp(f.lo ?? legacyLo, l.defaultLo ?? l.def.min);
+      l.hi = clamp(f.hi, l.def.max);
     }
     const codes = new Set(Array.isArray(s.countries) ? s.countries : []);
     engine.country.selected = new Set(countryDef.categories.filter((c) => codes.has(c.code)).map((c) => c.id));
@@ -214,7 +233,6 @@ async function boot() {
     overlay.setOpacity(Number(opacity.value) / 100);
     opacityValue.textContent = `${opacity.value}%`;
     for (const [k, box] of refToggles) setReferenceVisible(map, k, box.checked);
-    towns.setMinPop(Number(townMinPop.value));
     applyTerrain();
   }
 
@@ -243,6 +261,8 @@ async function boot() {
     overlay.update(
       engine.colorize(res, viz, lut(viz?.def.colormap ?? "distance"), solid(MATCH_COLOR, 220), excluded, solid(MATCH_COLOR, 70)),
     );
+    towns.applyFilters();
+    townCount.textContent = `${towns.shownCount.toLocaleString()} of ${towns.totalCount.toLocaleString()} towns pass these filters (pinned towns always stay).`;
     for (const c of cards) c.refresh();
     const pct = (100 * res.matchCount) / res.regionCount;
     summary.textContent =
@@ -282,7 +302,7 @@ async function boot() {
     towns.refreshCards();
     schedule();
   };
-  townMinPop.onchange = terrain3d.onchange = exaggeration.oninput = () => {
+  terrain3d.onchange = exaggeration.oninput = () => {
     applyDisplay();
     schedule();
   };

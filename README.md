@@ -47,10 +47,13 @@ raw datasets ──► pipeline/build.py ──► web/public/data/*.bin.gz + ca
   cost of living, economy, people, nearest airport, the climate there, and a short
   Wikipedia summary. From zoom 8 on, town labels also show population, growth since
   2010 and typical home value. Use **📌** to pin a card: pinned cards stay at every
-  zoom and are saved with saved views and in the URL. **Towns: minimum population**
-  (default 2,000) hides smaller places; smaller towns also only appear as you zoom in.
-  Detailed statistics are US-only for now; elsewhere cards show population, airport,
-  climate and Wikipedia, and missing values show as *n/a*.
+  zoom and are saved with saved views and in the URL. Smaller towns only appear as
+  you zoom in. Detailed statistics are US-only for now; elsewhere cards show
+  population, airport, climate and Wikipedia, and missing values show as *n/a*.
+* **Town filters** (sidebar) decide which towns are drawn, separately from the area
+  colouring: population (default 2,000+), population change since 2010, home
+  value and median household income. A town with no data for an active filter is
+  hidden. Pinned cards always stay.
 * **3D terrain** (Map display): tilts the map and raises the terrain, with an
   exaggeration slider. Right-drag (or Ctrl-drag, or two fingers) to tilt and rotate.
   Off by default because it is heavier on the graphics card.

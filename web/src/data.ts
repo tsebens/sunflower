@@ -1,6 +1,6 @@
 // Catalog types and binary layer loading.
 
-export type Unit = "degC" | "mm" | "km" | "m" | "hours" | "Mbps" | "zone";
+export type Unit = "degC" | "mm" | "km" | "m" | "hours" | "Mbps" | "zone" | "people" | "usd" | "pct";
 
 export interface Grid {
   west: number;
@@ -45,6 +45,8 @@ export interface NumericLayerDef extends Partial<Quantized> {
   min: number;
   max: number;
   variantLabel?: string;
+  /** Slider spacing: "log" for values spanning orders of magnitude (population, prices). */
+  axis?: "linear" | "log";
   variants?: VariantDef[];
 }
 

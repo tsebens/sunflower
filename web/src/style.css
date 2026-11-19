@@ -279,3 +279,4 @@ select, .search {
 .town-popup.pinned .maplibregl-popup-content { outline: 2px solid var(--accent); }
 #exaggeration-row:not([hidden]) { display: grid; gap: 4px; }
 #exaggeration { width: 100%; accent-color: var(--accent); }
+.group-note { margin: -4px 16px 10px; }

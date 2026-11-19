@@ -1,9 +1,26 @@
 // Sidebar widgets: numeric range filter (with histogram) and category checklist.
 
+import type { NumericLayerDef } from "./data";
 import { BINS, isActive, type CategoricalLayer, type NumericLayer } from "./engine";
 import { fmt } from "./units";
 
 const STEPS = 400;
+
+/** Maps slider fraction (0..1) <-> value, linearly or logarithmically. Histogram bins use the same spacing. */
+export function sliderScale(def: Pick<NumericLayerDef, "min" | "max" | "axis">) {
+  if (def.axis === "log") {
+    const a = Math.log(def.min);
+    const b = Math.log(def.max);
+    return {
+      toValue: (t: number) => Math.exp(a + (b - a) * t),
+      toFrac: (v: number) => (Math.log(Math.min(def.max, Math.max(def.min, v))) - a) / (b - a),
+    };
+  }
+  return {
+    toValue: (t: number) => def.min + (def.max - def.min) * t,
+    toFrac: (v: number) => (v - def.min) / (def.max - def.min),
+  };
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -61,8 +78,9 @@ export function numericCard(layer: NumericLayer, onChange: (kind: "range" | "var
   ends.append(minLbl, maxLbl);
   card.append(range, ends);
 
-  const toValue = (pos: number) => def.min + ((def.max - def.min) * pos) / STEPS;
-  const toPos = (v: number) => Math.round(((v - def.min) / (def.max - def.min)) * STEPS);
+  const sc = sliderScale(def);
+  const toValue = (pos: number) => sc.toValue(pos / STEPS);
+  const toPos = (v: number) => Math.round(sc.toFrac(v) * STEPS);
 
   const sync = () => {
     let lo = Number(loIn.value);
@@ -75,7 +93,7 @@ export function numericCard(layer: NumericLayer, onChange: (kind: "range" | "var
   loIn.oninput = sync;
   hiIn.oninput = sync;
   reset.onclick = () => {
-    loIn.value = "0";
+    loIn.value = String(toPos(layer.defaultLo ?? def.min));
     hiIn.value = String(STEPS);
     sync();
   };
@@ -99,8 +117,8 @@ export function numericCard(layer: NumericLayer, onChange: (kind: "range" | "var
     const on = style.getPropertyValue("--hist-on").trim();
     const off = style.getPropertyValue("--hist-off").trim();
     for (let k = 0; k < BINS; k++) {
-      const binLo = def.min + ((def.max - def.min) * k) / BINS;
-      const binHi = def.min + ((def.max - def.min) * (k + 1)) / BINS;
+      const binLo = sc.toValue(k / BINS);
+      const binHi = sc.toValue((k + 1) / BINS);
       const inside = binHi > layer.lo && binLo < layer.hi;
       const fh = (Math.sqrt(full[k]) / peak) * (h - 2);
       const ch = cross ? (Math.sqrt(cross[k]) / peak) * (h - 2) : 0;
@@ -119,8 +137,14 @@ export function numericCard(layer: NumericLayer, onChange: (kind: "range" | "var
       hiIn.value = String(toPos(layer.hi));
       const active = isActive(layer);
       card.classList.toggle("active", active);
-      value.textContent = active ? `${fmt(layer.lo, def.unit)} – ${fmt(layer.hi, def.unit)}` : "Any";
-      reset.hidden = !active;
+      value.textContent = !active
+        ? "Any"
+        : layer.hi >= def.max
+          ? `≥ ${fmt(layer.lo, def.unit)}`
+          : layer.lo <= def.min
+            ? `≤ ${fmt(layer.hi, def.unit)}`
+            : `${fmt(layer.lo, def.unit)} – ${fmt(layer.hi, def.unit)}`;
+      reset.hidden = layer.lo === (layer.defaultLo ?? def.min) && layer.hi >= def.max;
       minLbl.textContent = fmt(def.min, def.unit);
       maxLbl.textContent = fmt(def.max, def.unit);
       draw();

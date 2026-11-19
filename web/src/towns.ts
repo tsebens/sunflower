@@ -2,7 +2,9 @@
 
 import * as maplibregl from "maplibre-gl";
 import { palettes, TOWN_DOT_IDS, TOWN_LABEL_IDS, TOWN_TIERS } from "./basemap";
-import { loadBytes } from "./data";
+import { loadBytes, type NumericLayerDef, type Unit } from "./data";
+import { BINS, type NumericLayer } from "./engine";
+import { sliderScale } from "./ui";
 
 /** Labels gain a stats line from this zoom level on. */
 export const STATS_ZOOM = 8;
@@ -131,6 +133,71 @@ function wikipedia(name: string, lat: number, lon: number): Promise<Wiki | null>
   return p;
 }
 
+// ---- town filters ---------------------------------------------------------------------
+
+interface TownFilterSpec {
+  id: string;
+  prop: string;
+  name: string;
+  description: string;
+  unit: Unit;
+  min: number;
+  max: number;
+  axis: "linear" | "log";
+  defaultLo?: number;
+  values(c: TownData["columns"]): (number | null)[];
+}
+
+const US_ONLY = "US towns only for now: setting this hides towns without this data.";
+
+export const TOWN_FILTERS: TownFilterSpec[] = [
+  {
+    id: "town_pop",
+    prop: "pop",
+    name: "Population",
+    description: "Smaller towns also only appear as you zoom in.",
+    unit: "people",
+    min: 1000,
+    max: 5_000_000,
+    axis: "log",
+    defaultLo: 2000,
+    values: (c) => c.pop,
+  },
+  {
+    id: "town_growth",
+    prop: "growth",
+    name: "Population change since 2010",
+    description: US_ONLY,
+    unit: "pct",
+    min: -30,
+    max: 100,
+    axis: "linear",
+    values: (c) => c.growth,
+  },
+  {
+    id: "town_home",
+    prop: "home",
+    name: "Home value",
+    description: `Typical home value (Zillow, or the Census median where Zillow has none). ${US_ONLY}`,
+    unit: "usd",
+    min: 50_000,
+    max: 3_000_000,
+    axis: "log",
+    values: (c) => c.zhvi.map((z, i) => z ?? c.homeValue[i]),
+  },
+  {
+    id: "town_income",
+    prop: "income",
+    name: "Median household income",
+    description: US_ONLY,
+    unit: "usd",
+    min: 20_000,
+    max: 250_000,
+    axis: "log",
+    values: (c) => c.income,
+  },
+];
+
 // ---- the layer ------------------------------------------------------------------------
 
 export interface TownsOptions {
@@ -146,7 +213,17 @@ export class Towns {
   private card: maplibregl.Popup;
   private cardIdx = -1;
   private pinned = new Map<number, maplibregl.Popup>();
-  private minPop = 2000;
+  /** Town filters, shaped like map-layer filters so the same slider cards can drive them. */
+  readonly filters: NumericLayer[];
+  private filterValues: Float64Array[];
+  private filterExpr = "";
+  /** Number of towns passing the town filters. */
+  shownCount = 0;
+
+  /** Total number of towns loaded. */
+  get totalCount(): number {
+    return this.data.count;
+  }
 
   constructor(
     private map: maplibregl.Map,
@@ -155,7 +232,32 @@ export class Towns {
   ) {
     const c = data.columns;
     c.id.forEach((id, i) => this.byId.set(id, i));
+    this.filters = TOWN_FILTERS.map((f) => ({
+      def: {
+        id: f.id,
+        name: f.name,
+        description: f.description,
+        group: "Towns",
+        type: "numeric",
+        unit: f.unit,
+        colormap: "",
+        source: "",
+        min: f.min,
+        max: f.max,
+        axis: f.axis,
+      } satisfies NumericLayerDef,
+      bands: [{ key: "", label: "", values: new Int16Array(0), scale: 1, offset: 0 }],
+      bandIndex: 0,
+      lo: f.defaultLo ?? f.min,
+      hi: f.max,
+      defaultLo: f.defaultLo,
+      fullHist: [],
+      crossHist: new Uint32Array(BINS),
+    }));
+    this.filterValues = TOWN_FILTERS.map((f) => Float64Array.from(f.values(c), (v) => (v == null ? NaN : v)));
+    this.filters.forEach((l, k) => (l.fullHist = [this.histogram(k, () => true)]));
     this.addLayers();
+    this.applyFilters();
     this.card = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "340px", className: "town-popup", offset: 8 });
     this.card.on("close", () => (this.cardIdx = -1));
     this.wireEvents();
@@ -176,7 +278,14 @@ export class Towns {
       features.push({
         type: "Feature",
         geometry: { type: "Point", coordinates: [c.lon[i], c.lat[i]] },
-        properties: { i, name: c.name[i], pop, tier, stats: parts.join("\n") },
+        properties: {
+          i,
+          name: c.name[i],
+          tier,
+          stats: parts.join("\n"),
+          // Filterable values; omitted when unknown so filters can drop towns without data.
+          ...Object.fromEntries(TOWN_FILTERS.map((f, k) => [f.prop, this.filterValues[k][i]]).filter(([, v]) => !Number.isNaN(v))),
+        },
       });
     }
     this.map.addSource("towns", { type: "geojson", data: { type: "FeatureCollection", features } });
@@ -225,13 +334,67 @@ export class Towns {
     });
   }
 
-  private tierFilter(k: number): maplibregl.FilterSpecification {
-    return ["all", ["==", ["get", "tier"], k], [">=", ["get", "pop"], this.minPop]];
+  /** Active bounds of each town filter: an end left at the slider's edge is open-ended. */
+  private bounds() {
+    return this.filters.map((l) => ({
+      lo: l.lo > l.def.min ? l.lo : -Infinity,
+      hi: l.hi < l.def.max ? l.hi : Infinity,
+      active: l.lo > l.def.min || l.hi < l.def.max,
+    }));
   }
 
-  setMinPop(n: number) {
-    if (n === this.minPop) return;
-    this.minPop = n;
+  private tierFilter(k: number): maplibregl.FilterSpecification {
+    const conds: unknown[] = [["==", ["get", "tier"], k]];
+    this.bounds().forEach((b, f) => {
+      if (!b.active) return;
+      const prop = TOWN_FILTERS[f].prop;
+      conds.push(["has", prop]); // no data -> hidden when this filter is set
+      if (b.lo > -Infinity) conds.push([">=", ["get", prop], b.lo]);
+      if (b.hi < Infinity) conds.push(["<=", ["get", prop], b.hi]);
+    });
+    return ["all", ...conds] as maplibregl.FilterSpecification;
+  }
+
+  private histogram(k: number, include: (i: number) => boolean): Uint32Array {
+    const h = new Uint32Array(BINS);
+    const sc = sliderScale(this.filters[k].def);
+    const vals = this.filterValues[k];
+    for (let i = 0; i < vals.length; i++) {
+      const v = vals[i];
+      if (Number.isNaN(v) || !include(i)) continue;
+      h[Math.min(BINS - 1, Math.max(0, Math.floor(sc.toFrac(v) * BINS)))]++;
+    }
+    return h;
+  }
+
+  /** Apply the town filters to the map, and refresh counts and cross-filter histograms. */
+  applyFilters() {
+    const b = this.bounds();
+    const n = this.data.count;
+    const fails = new Uint8Array(n);
+    const failIdx = new Int8Array(n);
+    b.forEach((bk, k) => {
+      if (!bk.active) return;
+      const vals = this.filterValues[k];
+      for (let i = 0; i < n; i++) {
+        const v = vals[i];
+        if (Number.isNaN(v) || v < bk.lo || v > bk.hi) {
+          fails[i]++;
+          failIdx[i] = k;
+        }
+      }
+    });
+    let shown = 0;
+    for (let i = 0; i < n; i++) if (fails[i] === 0) shown++;
+    this.shownCount = shown;
+    // Each slider's coloured bars: towns passing every *other* town filter.
+    this.filters.forEach((l, k) => {
+      l.crossHist = this.histogram(k, (i) => fails[i] === 0 || (fails[i] === 1 && failIdx[i] === k));
+    });
+
+    const expr = JSON.stringify(b);
+    if (expr === this.filterExpr || !this.map.getLayer(TOWN_DOT_IDS[0])) return;
+    this.filterExpr = expr;
     TOWN_TIERS.forEach((_, k) => {
       this.map.setFilter(TOWN_DOT_IDS[k], this.tierFilter(k));
       this.map.setFilter(TOWN_LABEL_IDS[k], this.tierFilter(k));
