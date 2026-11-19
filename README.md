@@ -43,7 +43,7 @@ raw datasets ──► pipeline/build.py ──► web/public/data/*.bin.gz + ca
   roads, and cities & towns.
 * **Click** anywhere to see all values for that spot. If the spot doesn't match,
   the values that break your filters are shown in red.
-* **Towns.** Hover over (or click) a town to see its card: population and growth,
+* **Towns.** Click a town to see its card: population and growth,
   cost of living, economy, people, nearest airport, the climate there, and a short
   Wikipedia summary. From zoom 8 on, town labels also show population, growth since
   2010 and typical home value. Use **📌** to pin a card: pinned cards stay at every

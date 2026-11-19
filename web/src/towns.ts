@@ -1,4 +1,4 @@
-// Towns layer: dots + labels (with stats when zoomed in), hover/click cards, and pinned cards.
+// Towns layer: dots + labels (with stats when zoomed in), click-to-open cards, and pinned cards.
 
 import * as maplibregl from "maplibre-gl";
 import { palettes, TOWN_DOT_IDS, TOWN_LABEL_IDS, TOWN_TIERS } from "./basemap";
@@ -143,10 +143,8 @@ export interface TownsOptions {
 
 export class Towns {
   private byId = new Map<string, number>();
-  private hover: maplibregl.Popup;
-  private hoverIdx = -1;
-  private hoverSticky = false;
-  private closeTimer = 0;
+  private card: maplibregl.Popup;
+  private cardIdx = -1;
   private pinned = new Map<number, maplibregl.Popup>();
   private minPop = 2000;
 
@@ -158,11 +156,8 @@ export class Towns {
     const c = data.columns;
     c.id.forEach((id, i) => this.byId.set(id, i));
     this.addLayers();
-    this.hover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "340px", className: "town-popup", offset: 8 });
-    this.hover.on("close", () => {
-      this.hoverIdx = -1;
-      this.hoverSticky = false;
-    });
+    this.card = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "340px", className: "town-popup", offset: 8 });
+    this.card.on("close", () => (this.cardIdx = -1));
     this.wireEvents();
   }
 
@@ -275,44 +270,27 @@ export class Towns {
     return -1;
   }
 
+  /** Hovering only changes the cursor; cards open on click (see main.ts). */
   private wireEvents() {
     let raf = 0;
     this.map.on("mousemove", (e) => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        const i = this.townAt(e.point);
-        this.map.getCanvas().style.cursor = i >= 0 ? "pointer" : "";
-        if (i >= 0) {
-          clearTimeout(this.closeTimer);
-          if (i !== this.hoverIdx && !this.pinned.has(i) && !this.hoverSticky) this.showCard(i, false);
-        } else if (this.hoverIdx >= 0 && !this.hoverSticky) {
-          this.scheduleClose();
-        }
+        this.map.getCanvas().style.cursor = this.townAt(e.point) >= 0 ? "pointer" : "";
       });
     });
-    this.map.on("mouseout", () => this.hoverIdx >= 0 && !this.hoverSticky && this.scheduleClose());
   }
 
-  private scheduleClose() {
-    clearTimeout(this.closeTimer);
-    this.closeTimer = window.setTimeout(() => this.hover.remove(), 350);
-  }
-
-  /** Open a town's card. Clicked cards stay until closed; hovered ones close when the mouse leaves. */
-  showCard(i: number, sticky: boolean) {
+  /** Open a town's card; it stays until closed, another town is clicked, or the map is clicked. */
+  showCard(i: number) {
     if (this.pinned.has(i)) return;
-    clearTimeout(this.closeTimer);
-    this.hoverIdx = i;
-    this.hoverSticky = sticky;
-    const el = this.cardElement(i, false);
-    el.addEventListener("mouseenter", () => clearTimeout(this.closeTimer));
-    el.addEventListener("mouseleave", () => !this.hoverSticky && this.scheduleClose());
-    this.hover.setDOMContent(el).setLngLat([this.data.columns.lon[i], this.data.columns.lat[i]]).addTo(this.map);
+    this.cardIdx = i;
+    this.card.setDOMContent(this.cardElement(i, false)).setLngLat([this.data.columns.lon[i], this.data.columns.lat[i]]).addTo(this.map);
   }
 
   closeCard() {
-    this.hover.remove();
+    this.card.remove();
   }
 
   // -- pins --
@@ -328,7 +306,7 @@ export class Towns {
   }
 
   private pin(i: number, notify = true) {
-    if (this.hoverIdx === i) this.hover.remove();
+    if (this.cardIdx === i) this.card.remove();
     const popup = new maplibregl.Popup({
       closeButton: false,
       closeOnClick: false,
@@ -353,7 +331,7 @@ export class Towns {
       const collapsed = popup.getElement()?.querySelector(".town-card")?.classList.contains("collapsed") ?? true;
       popup.setDOMContent(this.cardElement(i, true, collapsed));
     }
-    if (this.hoverIdx >= 0 && this.hover.isOpen()) this.showCard(this.hoverIdx, this.hoverSticky);
+    if (this.cardIdx >= 0 && this.card.isOpen()) this.showCard(this.cardIdx);
   }
 
   // -- card --
@@ -408,7 +386,7 @@ export class Towns {
         <div class="tc-actions">
           ${pinned ? `<button class="tc-btn tc-toggle" title="Show or hide details">${collapsed ? "▸" : "▾"}</button>` : ""}
           <button class="tc-btn tc-pin${pinned ? " on" : ""}" title="${pinned ? "Unpin" : "Pin this card to the map"}">📌</button>
-          ${pinned ? `<button class="tc-btn tc-close" title="Unpin and close">×</button>` : ""}
+          <button class="tc-btn tc-close" title="${pinned ? "Unpin and close" : "Close"}">×</button>
         </div>
       </div>
       <div class="tc-summary">${short(c.pop[i])} people${c.growth[i] != null ? ` (${signed(c.growth[i])} since 2010)` : ""}${home != null || c.homeValue[i] != null ? ` · ${moneyShort((home ?? c.homeValue[i])!)} homes` : ""}</div>
@@ -428,7 +406,7 @@ export class Towns {
       </div>`;
 
     el.querySelector(".tc-pin")!.addEventListener("click", () => (pinned ? this.unpin(i) : this.pin(i)));
-    el.querySelector(".tc-close")?.addEventListener("click", () => this.unpin(i));
+    el.querySelector(".tc-close")!.addEventListener("click", () => (pinned ? this.unpin(i) : this.closeCard()));
     el.querySelector(".tc-toggle")?.addEventListener("click", (ev) => {
       const collapsedNow = el.classList.toggle("collapsed");
       (ev.currentTarget as HTMLElement).textContent = collapsedNow ? "▸" : "▾";

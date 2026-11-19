@@ -306,7 +306,7 @@ async function boot() {
     const t = towns.townAt(e.point);
     if (t >= 0) {
       popup.remove();
-      towns.showCard(t, true);
+      towns.showCard(t);
       return;
     }
     towns.closeCard();
