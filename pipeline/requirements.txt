@@ -4,3 +4,6 @@ rasterio
 geopandas
 pyogrio
 shapely
+pandas
+pyarrow
+netCDF4

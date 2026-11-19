@@ -8,23 +8,21 @@ Preference order for any layer: **one consistent dataset covering every region**
 then per-region datasets stitched together. Stitched layers can't be compared
 fairly across borders, so mark them clearly in the UI.
 
+## Done
+
+Humidity (summer dew point), sunshine hours, growing zone, elevation and home
+internet speed. See the README for sources.
+
 ## Easy next steps (global, gridded, free)
 
-- **Humidity.** Either WorldClim 2.1 monthly water vapour pressure (`vapr`), turned
-  into summer relative humidity or dew point using WorldClim temperatures, or
-  ERA5-Land. Dew point is probably the most useful "muggy" measure.
-- **Elevation.** WorldClim's elevation file or GMTED2010. Cheap to add.
-- **Cloudiness / sunshine.** EarthEnv MODIS cloud frequency (Wilson & Jetz 2016,
-  1 km, global) as a proxy for sunny days, or CRU CL2.0 sunshine percentage.
 - **Air quality.** Washington University (ACAG) satellite-derived yearly PM2.5,
-  global, ~1 km.
-- **Internet speed.** Ookla Open Data speed tiles (global, quarterly, fixed
-  and mobile). Could summarise as the median download speed per cell. In the US,
-  the FCC National Broadband Map is an alternative.
-- **Growing zone.** The USDA zone is defined from the *average yearly coldest
-  night*. Calculating it ourselves from one global daily dataset (ERA5-Land) gives
-  zones that line up across countries. For the US only, the USDA 2023 map (PRISM)
-  is available directly.
+  global, ~1 km. Downloads are behind a Box/Globus page, so they may have to be
+  fetched by hand.
+- **Mobile coverage/speed.** Ookla publishes mobile tiles alongside fixed ones.
+- **Snow.** Days with snow on the ground (e.g. MODIS snow cover) as a separate
+  filter from temperature.
+- **Better sunshine data.** EarthEnv MODIS cloud frequency (1 km) would sharpen the
+  18 km CRU sunshine layer.
 
 ## Natural hazards
 

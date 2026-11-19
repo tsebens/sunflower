@@ -31,6 +31,8 @@ export interface Result {
   /** Min/max of the visualised layer among matching cells (base units). */
   vizMin: number;
   vizMax: number;
+  /** Matching cells with no value for the visualised layer. */
+  vizNoData: number;
 }
 
 export const band = (l: NumericLayer): Band => l.bands[l.bandIndex];
@@ -89,8 +91,17 @@ export class Engine {
     for (const l of this.numeric) l.crossHist = new Uint32Array(BINS);
 
     const vizIdx = viz ? this.numeric.indexOf(viz) : -1;
-    let vizMinRaw = Infinity;
-    let vizMaxRaw = -Infinity;
+    // Fine histogram of the visualised layer over matching cells, for a percentile colour stretch.
+    const VB = 1024;
+    let vizNoData = 0;
+    const vizHist = new Uint32Array(VB);
+    const vizLayer = viz;
+    const vizBand = viz ? band(viz) : null;
+    const vizBin = (raw: number) => {
+      const v = raw * vizBand!.scale + vizBand!.offset;
+      const k = Math.floor(((v - vizLayer!.def.min) / (vizLayer!.def.max - vizLayer!.def.min)) * VB);
+      return k < 0 ? 0 : k >= VB ? VB - 1 : k;
+    };
 
     const pass = new Uint8Array(n);
     let matchCount = 0;
@@ -120,10 +131,8 @@ export class Engine {
         }
         if (vizIdx >= 0) {
           const v = arrs[vizIdx][i];
-          if (v !== nodata) {
-            if (v < vizMinRaw) vizMinRaw = v;
-            if (v > vizMaxRaw) vizMaxRaw = v;
-          }
+          if (v !== nodata) vizHist[vizBin(v)]++;
+          else vizNoData++;
         }
       } else if (fails === 1 && failIdx >= 0) {
         // Fails only this layer's own filter: counts toward that layer's cross-filter histogram.
@@ -132,14 +141,23 @@ export class Engine {
       }
     }
 
-    const vb = viz ? band(viz) : null;
-    return {
-      pass,
-      matchCount,
-      regionCount: this.regionCount,
-      vizMin: vb && vizMinRaw <= vizMaxRaw ? vizMinRaw * vb.scale + vb.offset : NaN,
-      vizMax: vb && vizMinRaw <= vizMaxRaw ? vizMaxRaw * vb.scale + vb.offset : NaN,
-    };
+    // Clip the colour scale to the 2nd–98th percentile so a few outliers don't wash it out.
+    let vizMin = NaN;
+    let vizMax = NaN;
+    const total = vizHist.reduce((a, b) => a + b, 0);
+    if (viz && total > 0) {
+      const binValue = (k: number) => viz.def.min + ((viz.def.max - viz.def.min) * k) / VB;
+      let acc = 0;
+      for (let k = 0; k < VB; k++) {
+        acc += vizHist[k];
+        if (Number.isNaN(vizMin) && acc >= total * 0.02) vizMin = binValue(k);
+        if (acc >= total * 0.98) {
+          vizMax = binValue(k + 1);
+          break;
+        }
+      }
+    }
+    return { pass, matchCount, regionCount: this.regionCount, vizMin, vizMax, vizNoData };
   }
 
   /** Colour every grid cell (row-major, north-up, lat/lon grid) into packed RGBA ints. */
@@ -149,6 +167,7 @@ export class Engine {
     lut: Uint32Array,
     matchColor: number,
     excludedColor: number,
+    noDataColor: number,
   ): Uint32Array {
     const { n, nodata } = this;
     const cv = this.country.values;
@@ -162,7 +181,7 @@ export class Engine {
       } else if (vb) {
         const raw = vb.values[i];
         if (raw === nodata) {
-          out[i] = excludedColor;
+          out[i] = noDataColor;
         } else {
           const t = (raw * vb.scale + vb.offset - res.vizMin) / span;
           out[i] = lut[Math.max(0, Math.min(255, Math.round(t * 255)))];

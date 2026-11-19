@@ -97,7 +97,7 @@ async function boot() {
     const viz = currentViz();
     const res = (last = engine.run(viz));
     const excluded = showExcluded.checked ? solid(dark ? "#555555" : "#9a9a9a", 110) : 0;
-    overlay.update(engine.colorize(res, viz, lut(viz?.def.colormap ?? "distance"), solid(MATCH_COLOR, 220), excluded));
+    overlay.update(engine.colorize(res, viz, lut(viz?.def.colormap ?? "distance"), solid(MATCH_COLOR, 220), excluded, solid(MATCH_COLOR, 70)));
     for (const c of cards) c.refresh();
     const pct = (100 * res.matchCount) / res.regionCount;
     summary.textContent =
@@ -123,7 +123,8 @@ async function boot() {
     legend.innerHTML = `<div class="legend-title">${name}</div>
       <div class="ramp" style="background:${grad}"></div>
       <div class="legend-ends"><span>${fmt(res.vizMin, viz.def.unit)}</span><span>${fmt(res.vizMax, viz.def.unit)}</span></div>
-      <div class="legend-note">Colours stretch across the areas that match.</div>`;
+      <div class="legend-note">Colours stretch across the areas that match (extremes clipped).</div>
+      ${res.vizNoData > 0.01 * res.matchCount ? `<div class="legend-nodata"><span class="swatch small" style="background:${MATCH_COLOR};opacity:.35"></span>Matches, but no data for this layer</div>` : ""}`;
   }
 
   vizSelect.onchange = schedule;

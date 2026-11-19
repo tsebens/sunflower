@@ -1,6 +1,6 @@
 // Catalog types and binary layer loading.
 
-export type Unit = "degC" | "mm" | "km";
+export type Unit = "degC" | "mm" | "km" | "m" | "hours" | "Mbps" | "zone";
 
 export interface Grid {
   west: number;

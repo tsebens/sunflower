@@ -375,6 +375,66 @@
    "max": 5123.0
   },
   {
+   "id": "dewpoint_summer",
+   "name": "Summer mugginess",
+   "description": "Dew point in the 3 most humid months. Under ~55 \u00b0F (13 \u00b0C) feels comfortable; over ~65 \u00b0F (18 \u00b0C) feels muggy.",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "degC",
+   "colormap": "humidity",
+   "source": "WorldClim 2.1 water vapour pressure",
+   "file": "dewpoint_summer.bin.gz",
+   "scale": 0.1,
+   "offset": 0.0,
+   "min": -23.0,
+   "max": 25.0
+  },
+  {
+   "id": "sunshine_hours",
+   "name": "Sunshine",
+   "description": "Hours of bright sunshine per year (1961\u20131990 averages, ~18 km detail).",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "hours",
+   "colormap": "sunshine",
+   "source": "CRU CL 2.0 sunshine",
+   "file": "sunshine_hours.bin.gz",
+   "scale": 1,
+   "offset": 0.0,
+   "min": 619.0,
+   "max": 3925.0
+  },
+  {
+   "id": "hardiness_zone",
+   "name": "Growing zone",
+   "description": "USDA plant hardiness zone, from the average coldest night of the year (1991\u20132020). Estimated, not the official USDA map.",
+   "group": "Climate",
+   "type": "numeric",
+   "unit": "zone",
+   "colormap": "zones",
+   "source": "NOAA CPC daily temperature + WorldClim 2.1 (downscaled)",
+   "file": "hardiness_zone.bin.gz",
+   "scale": 0.01,
+   "offset": 0.0,
+   "min": -2.0,
+   "max": 14.0
+  },
+  {
+   "id": "elevation",
+   "name": "Elevation",
+   "description": "Average height above sea level.",
+   "group": "Geography",
+   "type": "numeric",
+   "unit": "m",
+   "colormap": "elevation",
+   "source": "WorldClim 2.1 elevation (SRTM)",
+   "file": "elevation.bin.gz",
+   "scale": 1,
+   "offset": 0.0,
+   "min": -74.0,
+   "max": 4507.0
+  },
+  {
    "id": "dist_coast",
    "name": "Distance to the ocean",
    "description": "Straight-line distance to the nearest ocean coastline.",
@@ -439,6 +499,21 @@
    ],
    "min": 0.0,
    "max": 4021.0
+  },
+  {
+   "id": "internet_down",
+   "name": "Home internet speed",
+   "description": "Typical fixed-broadband download speed from Ookla speed tests (Jul\u2013Sep 2026). Blank where too few tests were run, so rural areas often have no data.",
+   "group": "Services",
+   "type": "numeric",
+   "unit": "Mbps",
+   "colormap": "speed",
+   "source": "Ookla Open Data (fixed broadband)",
+   "file": "internet_down.bin.gz",
+   "scale": 1,
+   "offset": 0.0,
+   "min": 0.0,
+   "max": 1427.0
   }
  ]
 }
