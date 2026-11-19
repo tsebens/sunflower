@@ -9,6 +9,17 @@ type Expr = maplibregl.ExpressionSpecification;
 
 export const GRID_BEFORE = "hillshade"; // the data overlay is inserted just below this layer
 
+/** Population tiers for the towns layer: each tier appears from its own zoom level. */
+export const TOWN_TIERS = [
+  { minPop: 250_000, minzoom: 2.5, radius: 4 },
+  { minPop: 50_000, minzoom: 5, radius: 3.2 },
+  { minPop: 15_000, minzoom: 6.5, radius: 2.6 },
+  { minPop: 5_000, minzoom: 7.5, radius: 2.2 },
+  { minPop: 0, minzoom: 8.5, radius: 1.8 },
+];
+export const TOWN_DOT_IDS = TOWN_TIERS.map((_, t) => `town_dot_${t}`);
+export const TOWN_LABEL_IDS = TOWN_TIERS.map((_, t) => `town_label_${t}`);
+
 export interface ReferenceLayer {
   key: string;
   label: string;
@@ -30,12 +41,13 @@ export const REFERENCE_LAYERS: ReferenceLayer[] = [
   {
     key: "places",
     label: "Cities & towns",
-    layers: ["dot_city", "dot_town", "label_city", "label_town", "label_village"],
+    hint: "hover or click for details",
+    layers: [...TOWN_DOT_IDS, ...TOWN_LABEL_IDS],
     default: true,
   },
 ];
 
-const palettes = {
+export const palettes = {
   light: {
     land: "#f3f1ec",
     water: "#c3d3dc",
@@ -79,45 +91,6 @@ const notMaritime: Expr = ["!=", ["get", "maritime"], 1];
 const roadClass = (classes: string[]): Expr => ["all", lines, ["match", ["get", "class"], classes, true, false]];
 const zoomWidth = (pairs: number[]): Expr => ["interpolate", ["exponential", 1.4], ["zoom"], ...pairs];
 const name: Expr = ["coalesce", ["get", "name_en"], ["get", "name:latin"], ["get", "name"]];
-
-function placeLayers(c: (typeof palettes)["light"]): Layer[] {
-  const cls = (k: string): Expr => ["==", ["get", "class"], k];
-  const dot = (id: string, k: string, minzoom: number, radius: number): Layer => ({
-    id,
-    type: "circle",
-    source: "omt",
-    "source-layer": "place",
-    minzoom,
-    maxzoom: 10,
-    filter: cls(k),
-    paint: { "circle-color": c.dot, "circle-radius": radius, "circle-stroke-color": c.halo, "circle-stroke-width": 1 },
-  });
-  const label = (id: string, k: string, minzoom: number, font: string, size: Expr | number): Layer => ({
-    id,
-    type: "symbol",
-    source: "omt",
-    "source-layer": "place",
-    minzoom,
-    filter: cls(k),
-    layout: {
-      "text-field": name,
-      "text-font": [font],
-      "text-size": size,
-      "text-anchor": "bottom",
-      "text-offset": [0, -0.35],
-      "text-max-width": 8,
-      "symbol-sort-key": ["coalesce", ["get", "rank"], 99],
-    },
-    paint: { "text-color": c.text, "text-halo-color": c.halo, "text-halo-width": 1.4 },
-  });
-  return [
-    dot("dot_city", "city", 3, 2.6),
-    dot("dot_town", "town", 6, 1.6),
-    label("label_village", "village", 10, "Noto Sans Regular", 11),
-    label("label_town", "town", 6, "Noto Sans Regular", 11),
-    label("label_city", "city", 3, "Noto Sans Bold", ["interpolate", ["linear"], ["zoom"], 3, 11, 10, 16]),
-  ];
-}
 
 export function basemapStyle(dark: boolean): maplibregl.StyleSpecification {
   const c = dark ? palettes.dark : palettes.light;
@@ -256,7 +229,6 @@ export function basemapStyle(dark: boolean): maplibregl.StyleSpecification {
       },
       paint: { "text-color": c.state, "text-halo-color": c.halo, "text-halo-width": 1.2 },
     },
-    ...placeLayers(c),
     {
       id: "label_country",
       type: "symbol",
@@ -285,6 +257,15 @@ export function basemapStyle(dark: boolean): maplibregl.StyleSpecification {
         url: "https://tiles.openfreemap.org/planet",
         attribution:
           '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      },
+      // A separate copy of the elevation source for 3D terrain (recommended over sharing
+      // one source between hillshade and terrain).
+      terrain3d: {
+        type: "raster-dem",
+        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        encoding: "terrarium",
+        tileSize: 256,
+        maxzoom: 13,
       },
       terrain: {
         type: "raster-dem",

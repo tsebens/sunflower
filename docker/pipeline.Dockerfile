@@ -6,4 +6,4 @@ FROM python:3.13
 COPY pipeline/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 WORKDIR /work
-CMD ["bash", "-c", "pipeline/download.sh && python pipeline/build.py"]
+CMD ["bash", "-c", "pipeline/download.sh && python pipeline/build.py && python pipeline/towns.py"]

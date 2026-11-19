@@ -41,7 +41,19 @@ raw datasets ──► pipeline/build.py ──► web/public/data/*.bin.gz + ca
   switch individual reference layers on or off: terrain shading, state/province
   borders, county borders (these appear once you zoom in to roughly metro level),
   roads, and cities & towns.
-* **Click** anywhere to see all values for that spot.
+* **Click** anywhere to see all values for that spot. If the spot doesn't match,
+  the values that break your filters are shown in red.
+* **Towns.** Hover over (or click) a town to see its card: population and growth,
+  cost of living, economy, people, nearest airport, the climate there, and a short
+  Wikipedia summary. From zoom 8 on, town labels also show population, growth since
+  2010 and typical home value. Use **📌** to pin a card: pinned cards stay at every
+  zoom and are saved with saved views and in the URL. **Towns: minimum population**
+  (default 2,000) hides smaller places; smaller towns also only appear as you zoom in.
+  Detailed statistics are US-only for now; elsewhere cards show population, airport,
+  climate and Wikipedia, and missing values show as *n/a*.
+* **3D terrain** (Map display): tilts the map and raises the terrain, with an
+  exaggeration slider. Right-drag (or Ctrl-drag, or two fingers) to tilt and rotate.
+  Off by default because it is heavier on the graphics card.
 * **Saved views** (sidebar): name and save the current filters and display
   settings, then switch between them with one click. Views are stored in your
   browser (`localStorage`), so they are per-browser and per-address, e.g.
@@ -90,7 +102,8 @@ Rebuilding the data:
 python3 -m venv .venv
 .venv/bin/pip install -r pipeline/requirements.txt
 pipeline/download.sh             # ~3 GB into data/raw (git-ignored)
-.venv/bin/python pipeline/build.py
+.venv/bin/python pipeline/build.py   # map layers
+.venv/bin/python pipeline/towns.py   # towns and their statistics
 ```
 
 To add a layer: get its source onto the grid in `build.py` (`read_worldclim`
@@ -133,6 +146,20 @@ derived from open datasets, so that's harmless here.
 | Distance to a major city | Natural Earth 1:10m populated places (`POP_MAX`, ≈ metro population) | Straight-line distance. Natural Earth misses some smaller cities, so the 100k+ option is the least complete. |
 
 | Home internet speed | [Ookla Open Data](https://github.com/teamookla/ookla-open-data) fixed broadband, Q3 2026 | Test-weighted geometric mean download speed; cells with fewer than 10 tests are left empty |
+
+### Towns
+
+| Data | Source | Notes |
+|---|---|---|
+| US towns and statistics | US Census Bureau, [American Community Survey](https://www.census.gov/programs-surveys/acs) 2020–2024 5-year estimates (bulk table files), 2024 and 2010 Gazetteer files | Every Census place (cities, towns, CDPs) with 1,000+ people. Small places have wide margins of error |
+| Home values | [Zillow Home Value Index](https://www.zillow.com/research/data/) (city level) | Typical home value and 5-year change; matched by name and state |
+| Towns outside the US | [GeoNames](https://www.geonames.org/) cities1000 | Population only |
+| Nearest airport | [OurAirports](https://ourairports.com/data/) | Large and medium airports with scheduled service |
+| Summaries | Wikipedia (fetched live by your browser when a card opens) | Matched by name among articles within 10 km |
+
+"Economy" comparisons on the cards are coloured green/red against the US figure
+where one direction is clearly healthier (income, growth, unemployment, poverty,
+price-to-income); other figures are shown for comparison without colour.
 
 **About the growing-zone estimate.** USDA zones are defined by the average
 coldest night of the year. A daily dataset covering every region (NOAA CPC) only
