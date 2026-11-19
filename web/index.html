@@ -11,13 +11,24 @@
       <header>
         <h1>🌻 Sunflower</h1>
         <p id="summary">Loading data…</p>
-        <label class="units"><input type="checkbox" id="imperial" checked /> Imperial units</label>
       </header>
-      <section class="viz">
-        <label for="viz-select">Colour the map by</label>
-        <select id="viz-select"></select>
-        <label class="inline"><input type="checkbox" id="show-excluded" checked /> Show areas that don't match in grey</label>
-      </section>
+      <details class="group" id="views-group">
+        <summary>Saved views</summary>
+        <div id="views" class="panel"></div>
+      </details>
+      <details class="group" open>
+        <summary>Map display</summary>
+        <div class="panel display">
+          <label for="viz-select" class="field-label">Colour the map by</label>
+          <select id="viz-select"></select>
+          <label class="inline"><input type="checkbox" id="show-excluded" checked /> Show areas that don't match in grey</label>
+          <label for="opacity" class="field-label">Overlay opacity <span id="opacity-value"></span></label>
+          <input type="range" id="opacity" min="10" max="100" step="5" value="80" />
+          <div class="field-label">Map layers</div>
+          <div id="ref-layers" class="toggles"></div>
+          <label class="inline"><input type="checkbox" id="imperial" checked /> Imperial units</label>
+        </div>
+      </details>
       <div id="filters"></div>
       <footer id="sources"></footer>
     </aside>

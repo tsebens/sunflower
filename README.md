@@ -35,6 +35,26 @@ raw datasets ──► pipeline/build.py ──► web/public/data/*.bin.gz + ca
 * **No server.** The app is static files, about 7 MB of data in total, so it runs from
   `npm run dev` locally or from GitHub Pages.
 
+## Using the map
+
+* **Map display** (sidebar): choose what colours the map, set the overlay opacity, and
+  switch individual reference layers on or off: terrain shading, state/province
+  borders, county borders (these appear once you zoom in to roughly metro level),
+  roads, and cities & towns.
+* **Click** anywhere to see all values for that spot.
+* **Saved views** (sidebar): name and save the current filters and display
+  settings, then switch between them with one click. Views are stored in your
+  browser (`localStorage`), so they are per-browser and per-address, e.g.
+  `localhost:8080` and the GitHub Pages site keep separate lists. Use **Export** /
+  **Import** to move them between browsers or as a backup.
+* **The address bar always holds the current view**, so reloading keeps your
+  filters and a copied link reopens the same view.
+
+The basemap is built from [OpenFreeMap](https://openfreemap.org) vector tiles
+(OpenStreetMap data) and [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)
+for the hillshade. Both are free and need no API key. The style is defined in
+`web/src/basemap.ts`.
+
 ## Running locally with Docker
 
 Only Docker is needed:

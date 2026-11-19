@@ -28,14 +28,14 @@ export function numericCard(layer: NumericLayer, onChange: (kind: "range" | "var
   card.append(head);
   if (def.description) card.append(el("p", "card-desc", def.description));
 
+  let segRow: HTMLElement | null = null;
   if (def.variants) {
-    const row = el("div", "segmented");
+    const row = (segRow = el("div", "segmented"));
     row.append(el("span", "seg-label", `${def.variantLabel ?? "Variant"}:`));
     layer.bands.forEach((b, idx) => {
       const btn = el("button", "seg", b.label);
       btn.onclick = () => {
         layer.bandIndex = idx;
-        row.querySelectorAll(".seg").forEach((s, j) => s.classList.toggle("on", j === idx));
         onChange("variant");
       };
       if (idx === layer.bandIndex) btn.classList.add("on");
@@ -114,6 +114,7 @@ export function numericCard(layer: NumericLayer, onChange: (kind: "range" | "var
   return {
     el: card,
     refresh() {
+      segRow?.querySelectorAll(".seg").forEach((s, j) => s.classList.toggle("on", j === layer.bandIndex));
       loIn.value = String(toPos(layer.lo));
       hiIn.value = String(toPos(layer.hi));
       const active = isActive(layer);

@@ -48,7 +48,7 @@ export class GridOverlay {
         id: "grid",
         type: "raster",
         source: "grid",
-        paint: { "raster-resampling": "nearest", "raster-opacity": 0.85, "raster-fade-duration": 0 },
+        paint: { "raster-resampling": "nearest", "raster-opacity": 0.8, "raster-fade-duration": 0 },
       },
       beforeId,
     );

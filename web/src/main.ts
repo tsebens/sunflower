@@ -3,18 +3,21 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import "./style.css";
 
+import { basemapStyle, GRID_BEFORE, REFERENCE_LAYERS, setReferenceVisible } from "./basemap";
 import { lut, MATCH_COLOR, rampStops, solid } from "./colormaps";
 import { loadBands, loadCatalog, loadUint8, type CategoricalLayerDef, type NumericLayerDef } from "./data";
 import { band, BINS, Engine, type NumericLayer, type Result } from "./engine";
 import { GridOverlay } from "./overlay";
 import { categoryCard, group, numericCard, type Card } from "./ui";
 import { fmt, settings } from "./units";
+import { decodeState, encodeState, stateKey, viewsPanel, type FilterState, type ViewState } from "./views";
 
 // Vite bundles MapLibre, so point it at its worker file explicitly.
 maplibregl.setWorkerUrl(workerUrl);
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const summary = $("summary");
+const DEFAULT_CITY_SIZE = "500000";
 
 function areaText(km2: number): string {
   const v = settings.imperial ? km2 / 2.589988 : km2;
@@ -34,40 +37,67 @@ async function boot() {
     ...numericDefs.map(loadBands),
   ]);
 
+  const defaultBand = (def: NumericLayerDef) =>
+    Math.max(0, def.variants ? def.variants.findIndex((v) => v.key === DEFAULT_CITY_SIZE) : 0);
   const numeric: NumericLayer[] = numericDefs.map((def, i) => ({
     def,
     bands: bandSets[i],
-    bandIndex: def.variants ? def.variants.findIndex((v) => v.key === "500000") : 0,
+    bandIndex: defaultBand(def),
     lo: def.min,
     hi: def.max,
     fullHist: [],
     crossHist: new Uint32Array(BINS),
   }));
-  for (const l of numeric) if (l.bandIndex < 0) l.bandIndex = 0;
   const engine = new Engine(catalog, { def: countryDef, values: countryValues, selected: new Set() }, numeric);
 
   // ---- map ---------------------------------------------------------------
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   const map = new maplibregl.Map({
     container: "map",
-    style: `https://basemaps.cartocdn.com/gl/${dark ? "dark-matter" : "positron"}-gl-style/style.json`,
+    style: basemapStyle(dark),
     center: [-50, 45],
     zoom: 2,
     attributionControl: { compact: true },
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  const scale = new maplibregl.ScaleControl({ unit: "imperial" });
+  map.addControl(scale, "bottom-right");
   await new Promise<void>((r) => map.once("load", () => r()));
-  const firstLabel = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
-  const overlay = new GridOverlay(map, catalog.grid, firstLabel);
+  const overlay = new GridOverlay(map, catalog.grid, GRID_BEFORE);
 
-  // ---- sidebar -------------------------------------------------------------
+  // ---- sidebar: display ------------------------------------------------------
   const vizSelect = $<HTMLSelectElement>("viz-select");
   vizSelect.append(new Option("Just show matching areas", ""));
   for (const l of numeric) vizSelect.append(new Option(l.def.name, l.def.id));
   vizSelect.value = "temp_mean";
   const showExcluded = $<HTMLInputElement>("show-excluded");
   const imperial = $<HTMLInputElement>("imperial");
+  const opacity = $<HTMLInputElement>("opacity");
+  const opacityValue = $("opacity-value");
 
+  const refToggles = new Map<string, HTMLInputElement>();
+  for (const ref of REFERENCE_LAYERS) {
+    const label = document.createElement("label");
+    label.className = "inline";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = ref.default;
+    box.onchange = () => {
+      setReferenceVisible(map, ref.key, box.checked);
+      schedule();
+    };
+    refToggles.set(ref.key, box);
+    label.append(box, ` ${ref.label}`);
+    if (ref.hint) {
+      const hint = document.createElement("span");
+      hint.className = "hint";
+      hint.textContent = ` (${ref.hint})`;
+      label.append(hint);
+    }
+    $("ref-layers").append(label);
+  }
+
+  // ---- sidebar: filters ------------------------------------------------------
   const cards: Card[] = [];
   const filters = $("filters");
   const countryCard = categoryCard(engine.country, () => schedule());
@@ -81,7 +111,73 @@ async function boot() {
   }
 
   const sources = [...new Set(catalog.layers.map((l) => l.source.replace(/ BIO\d+$/, "")))];
-  $("sources").innerHTML = `<strong>Data:</strong> ${sources.join(" · ")}. Climate values are 1970–2000 averages. Basemap © CARTO, © OpenStreetMap contributors.`;
+  $("sources").innerHTML = `<strong>Data:</strong> ${sources.join(" · ")}. Basemap: OpenFreeMap / OpenMapTiles, © OpenStreetMap contributors. Terrain: Mapzen / AWS Terrain Tiles.`;
+
+  // ---- view state (saved views + URL) ---------------------------------------------
+  function getState(): ViewState {
+    const f: Record<string, FilterState> = {};
+    for (const l of numeric) {
+      const s: FilterState = {};
+      if (l.lo > l.def.min) s.lo = Number(l.lo.toPrecision(6));
+      if (l.hi < l.def.max) s.hi = Number(l.hi.toPrecision(6));
+      if (l.def.variants && l.bandIndex !== defaultBand(l.def)) s.band = band(l).key;
+      if (Object.keys(s).length) f[l.def.id] = s;
+    }
+    return {
+      viz: vizSelect.value,
+      showExcluded: showExcluded.checked,
+      imperial: imperial.checked,
+      opacity: Number(opacity.value),
+      layers: Object.fromEntries([...refToggles].map(([k, b]) => [k, b.checked])),
+      filters: f,
+      countries: countryDef.categories.filter((c) => engine.country.selected.has(c.id)).map((c) => c.code),
+    };
+  }
+
+  function setState(s: Partial<ViewState>) {
+    if (typeof s.viz === "string" && [...vizSelect.options].some((o) => o.value === s.viz)) vizSelect.value = s.viz;
+    if (typeof s.showExcluded === "boolean") showExcluded.checked = s.showExcluded;
+    if (typeof s.imperial === "boolean") imperial.checked = s.imperial;
+    if (typeof s.opacity === "number") opacity.value = String(s.opacity);
+    for (const [k, box] of refToggles) {
+      const on = s.layers?.[k];
+      if (typeof on === "boolean") box.checked = on;
+    }
+    for (const l of numeric) {
+      const f = s.filters?.[l.def.id] ?? {};
+      const clamp = (v: unknown, fallback: number) =>
+        typeof v === "number" && Number.isFinite(v) ? Math.min(l.def.max, Math.max(l.def.min, v)) : fallback;
+      l.lo = clamp(f.lo, l.def.min);
+      l.hi = clamp(f.hi, l.def.max);
+      const bi = l.bands.findIndex((b) => b.key === f.band);
+      l.bandIndex = bi >= 0 ? bi : defaultBand(l.def);
+    }
+    const codes = new Set(Array.isArray(s.countries) ? s.countries : []);
+    engine.country.selected = new Set(countryDef.categories.filter((c) => codes.has(c.code)).map((c) => c.id));
+    applyDisplay();
+    schedule();
+  }
+
+  function clearFilters() {
+    const s = getState();
+    setState({ ...s, filters: {}, countries: [] });
+  }
+
+  function applyDisplay() {
+    settings.imperial = imperial.checked;
+    scale.setUnit(imperial.checked ? "imperial" : "metric");
+    overlay.setOpacity(Number(opacity.value) / 100);
+    opacityValue.textContent = `${opacity.value}%`;
+    for (const [k, box] of refToggles) setReferenceVisible(map, k, box.checked);
+  }
+
+  const defaults = stateKey(getState());
+  const views = viewsPanel($("views"), { get: getState, set: setState, reset: clearFilters });
+
+  function syncUrl(state: ViewState) {
+    const hash = stateKey(state) === defaults ? "" : `#v=${encodeState(state)}`;
+    if (location.hash !== hash) history.replaceState(null, "", hash || location.pathname + location.search);
+  }
 
   // ---- update loop -----------------------------------------------------------
   let last: Result | null = null;
@@ -97,7 +193,9 @@ async function boot() {
     const viz = currentViz();
     const res = (last = engine.run(viz));
     const excluded = showExcluded.checked ? solid(dark ? "#555555" : "#9a9a9a", 110) : 0;
-    overlay.update(engine.colorize(res, viz, lut(viz?.def.colormap ?? "distance"), solid(MATCH_COLOR, 220), excluded, solid(MATCH_COLOR, 70)));
+    overlay.update(
+      engine.colorize(res, viz, lut(viz?.def.colormap ?? "distance"), solid(MATCH_COLOR, 220), excluded, solid(MATCH_COLOR, 70)),
+    );
     for (const c of cards) c.refresh();
     const pct = (100 * res.matchCount) / res.regionCount;
     summary.textContent =
@@ -105,6 +203,9 @@ async function boot() {
         ? "No areas match all your filters. Try loosening one."
         : `${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}% of the mapped area matches (${areaText(engine.areaKm2(res.pass))}).`;
     drawLegend(viz, res);
+    const state = getState();
+    views.refresh(state);
+    syncUrl(state);
   }
 
   function drawLegend(viz: NumericLayer | null, res: Result) {
@@ -130,14 +231,25 @@ async function boot() {
   vizSelect.onchange = schedule;
   showExcluded.onchange = schedule;
   imperial.onchange = () => {
-    settings.imperial = imperial.checked;
+    applyDisplay();
+    schedule();
+  };
+  opacity.oninput = () => {
+    applyDisplay();
     schedule();
   };
   addEventListener("resize", schedule);
 
   // ---- click to inspect -------------------------------------------------------
   const popup = new maplibregl.Popup({ closeButton: true, maxWidth: "300px" });
+  // A single click inspects; wait briefly so a double-click (zoom) doesn't also open the popup.
+  let clickTimer = 0;
+  map.on("dblclick", () => clearTimeout(clickTimer));
   map.on("click", (e) => {
+    clearTimeout(clickTimer);
+    clickTimer = window.setTimeout(() => inspect(e), 250);
+  });
+  function inspect(e: maplibregl.MapMouseEvent) {
     const i = engine.cellAt(e.lngLat.lng, e.lngLat.lat);
     if (i < 0 || engine.country.values[i] === 0) return;
     const cat = countryDef.categories.find((c) => c.id === engine.country.values[i]);
@@ -150,8 +262,12 @@ async function boot() {
     const match = last?.pass[i] ? `<div class="pop-match yes">Matches your filters</div>` : `<div class="pop-match">Doesn't match your filters</div>`;
     const at = `${Math.abs(e.lngLat.lat).toFixed(2)}°${e.lngLat.lat >= 0 ? "N" : "S"}, ${Math.abs(e.lngLat.lng).toFixed(2)}°${e.lngLat.lng >= 0 ? "E" : "W"}`;
     popup.setLngLat(e.lngLat).setHTML(`${match}<table>${rows.join("")}</table><div class="pop-at">${at}</div>`).addTo(map);
-  });
+  }
 
+  // Restore a view from the URL (shared link or page reload), else use defaults.
+  const fromUrl = location.hash.startsWith("#v=") ? decodeState(location.hash.slice(3)) : null;
+  if (fromUrl) setState(fromUrl);
+  else applyDisplay();
   render();
 }
 
