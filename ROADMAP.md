@@ -24,6 +24,18 @@ internet speed. See the README for sources.
 - **Better sunshine data.** EarthEnv MODIS cloud frequency (1 km) would sharpen the
   18 km CRU sunshine layer.
 
+## Biome / landscape type
+
+Candidate category layers (filterable like Country):
+- **Ecoregions / biomes:** RESOLVE Ecoregions 2017 (Dinerstein et al.), 846 ecoregions
+  in 14 biomes, global, CC BY 4.0. Names like "Central Pacific coastal forests" or
+  "Snake-Columbia shrub steppe".
+- **Köppen-Geiger climate class:** Beck et al. 2023, 1 km, global (e.g. "Csb: warm-summer
+  Mediterranean", "Dfb: warm-summer humid continental").
+- **Land cover:** ESA WorldCover 2021 (10 m, global): share of each cell that is
+  forest, grassland, shrubland, cropland, bare rock and so on.
+- **Ruggedness:** terrain ruggedness or local relief computed from elevation.
+
 ## Natural hazards
 
 - **Wildfire.** A consistent option across all regions is MODIS burned-area

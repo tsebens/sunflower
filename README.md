@@ -41,6 +41,11 @@ raw datasets ──► pipeline/build.py ──► web/public/data/*.bin.gz + ca
   switch individual reference layers on or off: terrain shading, state/province
   borders, county borders (these appear once you zoom in to roughly metro level),
   roads, and cities & towns.
+* **Satellite imagery** (Map layers): a cloud-free Sentinel-2 mosaic from 2023
+  ([EOX Sentinel-2 cloudless](https://s2maps.eu), 10 m detail, licensed for
+  non-commercial use) under the data overlay. Turning it on lowers the overlay
+  opacity to 40% so the imagery shows through; drag opacity to 0% to see only the
+  imagery.
 * **Click** anywhere to see all values for that spot. If the spot doesn't match,
   the values that break your filters are shown in red.
 * **Towns.** Click a town to see its card: population and growth,
